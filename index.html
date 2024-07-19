@@ -92,18 +92,22 @@
         let intervalId;
 
         const ABI_CONTRATO = [{"inputs":[{"internalType":"address","name":"_flashLoanProvider","type":"address"},{"internalType":"address","name":"_uniswapRouter","type":"address"},{"internalType":"address","name":"_sushiswapRouter","type":"address"},{"internalType":"address","name":"_quickswapRouter","type":"address"}],"stateMutability":"nonpayable","type":"constructor"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"previousOwner","type":"address"},{"indexed":true,"internalType":"address","name":"newOwner","type":"address"}],"name":"OwnershipTransferred","type":"event"},{"inputs":[{"internalType":"uint256","name":"amount","type":"uint256"},{"internalType":"uint256","name":"minProfitPercentage","type":"uint256"},{"internalType":"uint256","name":"maxSlippage","type":"uint256"}],"name":"executarArbitragem","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"owner","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"renounceOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"newOwner","type":"address"}],"name":"transferOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"withdrawProfits","outputs":[],"stateMutability":"nonpayable","type":"function"}];
-        const ENDERECO_CONTRATO = "0xD152f549545093347A162Dce210e7293f1452150";
+        const ENDERECO_CONTRATO = "0xf3feae30f6d823fe03a276df19c50cbb36a822ee";
 
         async function conectarCarteira() {
             if (typeof window.ethereum !== 'undefined') {
                 try {
                     await window.ethereum.request({ method: 'eth_requestAccounts' });
+                    await window.ethereum.request({
+                        method: 'wallet_switchEthereumChain',
+                        params: [{ chainId: '0x89' }], // chainId para Polygon Mainnet
+                    });
                     web3 = new Web3(window.ethereum);
                     const contas = await web3.eth.getAccounts();
                     enderecoCarteira = contas[0];
                     document.getElementById('status').innerText = `Status da Carteira: Conectado (${enderecoCarteira})`;
                     contratoArbitragem = new web3.eth.Contract(ABI_CONTRATO, ENDERECO_CONTRATO);
-                    adicionarLog("Carteira conectada com sucesso.");
+                    adicionarLog("Carteira conectada com sucesso à rede Polygon.");
                     await verificarSaldos();
                 } catch (error) {
                     console.error("Erro ao conectar carteira:", error);
@@ -123,12 +127,12 @@
 
             try {
                 const saldoCarteira = await web3.eth.getBalance(enderecoCarteira);
-                const saldoCarteiraEth = web3.utils.fromWei(saldoCarteira, 'ether');
-                document.getElementById('saldoCarteira').innerText = `Saldo da Carteira: ${saldoCarteiraEth} ETH`;
+                const saldoCarteiraMatic = web3.utils.fromWei(saldoCarteira, 'ether');
+                document.getElementById('saldoCarteira').innerText = `Saldo da Carteira: ${saldoCarteiraMatic} MATIC`;
 
                 const saldoContrato = await web3.eth.getBalance(ENDERECO_CONTRATO);
-                const saldoContratoEth = web3.utils.fromWei(saldoContrato, 'ether');
-                document.getElementById('saldoContrato').innerText = `Saldo do Contrato: ${saldoContratoEth} ETH`;
+                const saldoContratoMatic = web3.utils.fromWei(saldoContrato, 'ether');
+                document.getElementById('saldoContrato').innerText = `Saldo do Contrato: ${saldoContratoMatic} MATIC`;
 
                 adicionarLog("Saldos atualizados com sucesso.");
             } catch (error) {
@@ -195,7 +199,7 @@
             if (intervalId) {
                 clearInterval(intervalId);
             }
-            intervalId = setInterval(executarArbitragem, 60000); // Aumentando o intervalo para 1 minuto
+            intervalId = setInterval(executarArbitragem, 60000); // Intervalo de 1 minuto
             adicionarLog("Arbitragem automática iniciada. Intervalo: 1 minuto.");
         }
 
