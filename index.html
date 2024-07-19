@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sistema de Arbitragem DeFi Automatizado com Flash Loans</title>
-        <style>
+<style>
         body {
             font-family: Arial, sans-serif;
             margin: 0;
@@ -160,7 +160,7 @@
         async function verificarSaldos() {
             if (!web3 || !enderecoCarteira) {
                 adicionarLog("Por favor, conecte sua carteira primeiro.");
-                return;
+                return false;
             }
 
             try {
@@ -173,9 +173,11 @@
                 document.getElementById('saldoContrato').innerText = `Saldo do Contrato: ${saldoContratoMatic} MATIC`;
 
                 adicionarLog("Saldos atualizados com sucesso.");
+                return true;
             } catch (error) {
                 console.error("Erro ao verificar saldos:", error);
                 adicionarLog("Erro ao verificar saldos: " + error.message);
+                return false;
             }
         }
 
@@ -238,6 +240,10 @@
                 ).send({ from: enderecoCarteira, gas: gasEstimado, gasPrice: gasPrice });
 
                 adicionarLog("Arbitragem executada com sucesso. Transação: " + result.transactionHash);
+                
+                // Atualizar os saldos após a execução da arbitragem
+                await verificarSaldos();
+
             } catch (error) {
                 console.error("Erro ao executar arbitragem:", error);
                 adicionarLog("Erro ao executar arbitragem: " + error.message);
