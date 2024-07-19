@@ -264,8 +264,8 @@
             if (intervalId) {
                 clearInterval(intervalId);
             }
-            intervalId = setInterval(executarArbitragem, 60000); // Intervalo de 1 minuto
-            adicionarLog("Arbitragem automática iniciada. Intervalo: 1 minuto.");
+            intervalId = setInterval(executarArbitragem, 10000); // Intervalo de 10 segundos
+            adicionarLog("Arbitragem automática iniciada. Intervalo: 10 segundos.");
         }
 
         function pararArbitragem() {
