@@ -45,6 +45,11 @@
             font-weight: bold;
             margin-bottom: 10px;
         }
+        #operacoesLog {
+            margin-top: 20px;
+            border-top: 1px solid #ccc;
+            padding-top: 10px;
+        }
     </style>
 </head>
 <body>
@@ -67,6 +72,11 @@
 
         <label for="quantidadeFlashLoan">Quantidade do Flash Loan (USDC):</label>
         <input type="number" id="quantidadeFlashLoan" min="0" step="100" value="10000">
+
+        <div id="operacoesLog">
+            <h3>Log de Operações Automáticas</h3>
+            <ul id="logList"></ul>
+        </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/web3@1.5.2/dist/web3.min.js"></script>
@@ -88,17 +98,20 @@
                     enderecoCarteira = contas[0];
                     document.getElementById('status').innerText = `Status da Carteira: Conectado (${enderecoCarteira})`;
                     contratoArbitragem = new web3.eth.Contract(ABI_CONTRATO, ENDERECO_CONTRATO);
+                    adicionarLog("Carteira conectada com sucesso.");
                 } catch (error) {
                     console.error("Erro ao conectar carteira:", error);
+                    adicionarLog("Erro ao conectar carteira: " + error.message);
                 }
             } else {
                 alert("Por favor, instale a MetaMask!");
+                adicionarLog("MetaMask não detectada. Por favor, instale-a.");
             }
         }
 
         async function executarArbitragem() {
-            if (!contratoArbitragem) {
-                alert("Por favor, conecte sua carteira primeiro.");
+            if (!contratoArbitragem || !enderecoCarteira) {
+                adicionarLog("Por favor, conecte sua carteira primeiro.");
                 return;
             }
 
@@ -108,6 +121,7 @@
             const quantidadeFlashLoan = document.getElementById('quantidadeFlashLoan').value;
 
             try {
+                adicionarLog("Iniciando execução de arbitragem...");
                 const estimativaGas = await contratoArbitragem.methods.executarArbitragem(
                     web3.utils.toWei(quantidadeFlashLoan, 'ether'),
                     web3.utils.toWei(lucroMinimo, 'ether'),
@@ -125,9 +139,10 @@
                     gas: estimativaGas,
                     gasPrice: precoGasWeb3
                 });
-                console.log("Arbitragem executada com sucesso:", result);
+                adicionarLog("Arbitragem executada com sucesso. Hash da transação: " + result.transactionHash);
             } catch (error) {
                 console.error("Erro ao executar arbitragem:", error);
+                adicionarLog("Erro ao executar arbitragem: " + error.message);
             }
         }
 
@@ -136,15 +151,22 @@
                 clearInterval(intervalId);
             }
             intervalId = setInterval(executarArbitragem, 5000);
-            console.log("Arbitragem automática iniciada");
+            adicionarLog("Arbitragem automática iniciada. Intervalo: 5 segundos.");
         }
 
         function pararArbitragem() {
             if (intervalId) {
                 clearInterval(intervalId);
                 intervalId = null;
-                console.log("Arbitragem automática parada");
+                adicionarLog("Arbitragem automática parada.");
             }
+        }
+
+        function adicionarLog(mensagem) {
+            const logList = document.getElementById('logList');
+            const logItem = document.createElement('li');
+            logItem.textContent = new Date().toLocaleTimeString() + " - " + mensagem;
+            logList.appendChild(logItem);
         }
     </script>
 </body>
