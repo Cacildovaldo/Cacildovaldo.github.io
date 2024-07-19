@@ -4,8 +4,73 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sistema de Arbitragem DeFi Automatizado com Flash Loans</title>
-    <style>
-        /* O estilo permanece o mesmo */
+        <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f0f0f0;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        h1, h2 {
+            color: #333;
+        }
+        button {
+            background-color: #4CAF50;
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 4px 2px;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+        input[type="number"] {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0;
+            box-sizing: border-box;
+        }
+        #status, #saldoCarteira, #saldoContrato {
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        #operacoesLog {
+            margin-top: 20px;
+            border-top: 1px solid #ccc;
+            padding-top: 10px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        #modal {
+            display: none;
+            position: fixed;
+            z-index: 1;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.4);
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: 15% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 80%;
+            max-width: 500px;
+        }
     </style>
 </head>
 <body>
@@ -55,9 +120,11 @@
         let contratoArbitragem;
         let enderecoCarteira;
         let intervalId;
+        let gasEstimado;
+        let gasPrice;
 
         const ABI_CONTRATO = [{"inputs":[{"internalType":"address","name":"_flashLoanProvider","type":"address"},{"internalType":"address","name":"_uniswapRouter","type":"address"},{"internalType":"address","name":"_sushiswapRouter","type":"address"},{"internalType":"address","name":"_quickswapRouter","type":"address"}],"stateMutability":"nonpayable","type":"constructor"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"previousOwner","type":"address"},{"indexed":true,"internalType":"address","name":"newOwner","type":"address"}],"name":"OwnershipTransferred","type":"event"},{"inputs":[{"internalType":"uint256","name":"amount","type":"uint256"},{"internalType":"uint256","name":"minProfitPercentage","type":"uint256"},{"internalType":"uint256","name":"maxSlippage","type":"uint256"}],"name":"executarArbitragem","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"owner","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"renounceOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"newOwner","type":"address"}],"name":"transferOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"withdrawProfits","outputs":[],"stateMutability":"nonpayable","type":"function"}];
-        const ENDERECO_CONTRATO = "0xf3feae30f6d823fe03a276df19c50cbb36a822ee";
+        const ENDERECO_CONTRATO = "0xf3feaE30F6D823fE03A276DF19c50cBb36A822EE";
 
         async function conectarCarteira() {
             if (typeof window.ethereum !== 'undefined') {
@@ -112,28 +179,44 @@
             }
         }
 
-        async function executarArbitragem() {
-            if (!contratoArbitragem || !enderecoCarteira) {
-                adicionarLog("Por favor, conecte sua carteira primeiro.");
-                return;
-            }
-
+        async function estimarGas() {
             const lucroMinimo = document.getElementById('lucroMinimo').value;
-            const precoMaximoGas = document.getElementById('precoMaximoGas').value;
             const slippageMaximo = document.getElementById('slippageMaximo').value;
             const quantidadeFlashLoan = document.getElementById('quantidadeFlashLoan').value;
 
             try {
-                adicionarLog("Iniciando execução de arbitragem...");
-                
-                const saldoCarteira = await web3.eth.getBalance(enderecoCarteira);
-                const gasEstimado = await contratoArbitragem.methods.executarArbitragem(
-                    web3.utils.toWei(quantidadeFlashLoan, 'ether'),
+                gasEstimado = await contratoArbitragem.methods.executarArbitragem(
+                    web3.utils.toWei(quantidadeFlashLoan, 'mwei'), // Supondo que USDC tenha 6 decimais
                     web3.utils.toWei(lucroMinimo, 'ether'),
                     web3.utils.toWei(slippageMaximo, 'ether')
                 ).estimateGas({ from: enderecoCarteira });
+                
+                gasPrice = await web3.eth.getGasPrice();
+                
+                return true;
+            } catch (error) {
+                console.error("Erro ao estimar gás:", error);
+                adicionarLog("Erro ao estimar gás: " + error.message);
+                return false;
+            }
+        }
 
-                const gasPrice = await web3.eth.getGasPrice();
+        async function executarArbitragem() {
+            if (!web3 || !enderecoCarteira) {
+                adicionarLog("Por favor, conecte sua carteira primeiro.");
+                return;
+            }
+
+            const precoMaximoGas = document.getElementById('precoMaximoGas').value;
+
+            try {
+                const saldosVerificados = await verificarSaldos();
+                if (!saldosVerificados) return;
+
+                const gasEstimadoValido = await estimarGas();
+                if (!gasEstimadoValido) return;
+
+                const saldoCarteira = await web3.eth.getBalance(enderecoCarteira);
                 const custoGasEstimado = BigInt(gasEstimado) * BigInt(gasPrice);
 
                 if (BigInt(saldoCarteira) < custoGasEstimado) {
@@ -149,7 +232,7 @@
                 }
 
                 const result = await contratoArbitragem.methods.executarArbitragem(
-                    web3.utils.toWei(quantidadeFlashLoan, 'ether'),
+                    web3.utils.toWei(quantidadeFlashLoan, 'mwei'), // Supondo que USDC tenha 6 decimais
                     web3.utils.toWei(lucroMinimo, 'ether'),
                     web3.utils.toWei(slippageMaximo, 'ether')
                 ).send({ from: enderecoCarteira, gas: gasEstimado, gasPrice: gasPrice });
