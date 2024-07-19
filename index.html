@@ -1,50 +1,17 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sistema de Arbitragem DeFi Automatizado com Flash Loans</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 20px;
-            background-color: #f0f0f0;
-        }
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
-            background-color: white;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 0 10px rgba(0,0,0,0.1);
-        }
-        h1, h2 {
-            color: #333;
-        }
-        button {
-            background-color: #4CAF50;
-            border: none;
-            color: white;
-            padding: 10px 20px;
-            text-align: center;
-            text-decoration: none;
-            display: inline-block;
-            font-size: 16px;
-            margin: 4px 2px;
-            cursor: pointer;
-            border-radius: 5px;
-        }
-        input[type="number"] {
-            width: 100%;
-            padding: 8px;
-            margin: 5px 0;
-            box-sizing: border-box;
-        }
-        #status {
-            font-weight: bold;
-            margin-bottom: 10px;
-        }
+     body { font-family: Arial, sans-serif; line-height: 1.6; margin: 0; padding: 20px; background-color: #f4f4f4; }
+        .container { max-width: 800px; margin: auto; background: white; padding: 20px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        h1 { color: #333; text-align: center; }
+        button { background-color: #4CAF50; border: none; color: white; padding: 10px 20px; text-align: center; text-decoration: none; display: inline-block; font-size: 16px; margin: 4px 2px; cursor: pointer; }
+        input[type="number"] { width: 100%; padding: 12px 20px; margin: 8px 0; display: inline-block; border: 1px solid #ccc; box-sizing: border-box; }
+        #status, #log { margin-top: 20px; }
+        #log { height: 200px; overflow-y: scroll; border: 1px solid #ddd; padding: 10px; }
     </style>
 </head>
 <body>
@@ -77,8 +44,8 @@
         let enderecoCarteira;
         let intervalId;
 
-        const ABI_CONTRATO = [{"inputs":[{"internalType":"address","name":"_addressProvider","type":"address"}],"stateMutability":"nonpayable","type":"constructor"},{"inputs":[],"name":"ADDRESSES_PROVIDER","outputs":[{"internalType":"contract IPoolAddressesProvider","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"_token","type":"address"},{"internalType":"uint256","name":"_amount","type":"uint256"},{"internalType":"uint8[]","name":"_dexList","type":"uint8[]"},{"internalType":"address[]","name":"_pairs","type":"address[]"},{"internalType":"uint256","name":"profit","type":"uint256"},{"internalType":"uint256","name":"timestamp","type":"uint256"},{"internalType":"uint256","name":"nonce","type":"uint256"},{"internalType":"bytes","name":"_signature","type":"bytes"}],"name":"ArbitrageOverdome","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"POOL","outputs":[{"internalType":"contract IPool","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"asset","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"},{"internalType":"uint256","name":"premium","type":"uint256"},{"internalType":"address","name":"initiator","type":"address"},{"internalType":"bytes","name":"params","type":"bytes"}],"name":"executeOperation","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"bytes32","name":"","type":"bytes32"}],"name":"isValidSign","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"token","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"withdrawFunds","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"},{"stateMutability":"payable","type":"receive"}];
-        const ENDERECO_CONTRATO = "0xf3feaE30F6D823fE03A276DF19c50cBb36A822EE"; // Endereço do seu contrato
+        const ABI_CONTRATO = [/* [{"inputs":[{"internalType":"address","name":"_addressProvider","type":"address"}],"stateMutability":"nonpayable","type":"constructor"},{"inputs":[],"name":"ADDRESSES_PROVIDER","outputs":[{"internalType":"contract IPoolAddressesProvider","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"_token","type":"address"},{"internalType":"uint256","name":"_amount","type":"uint256"},{"internalType":"uint8[]","name":"_dexList","type":"uint8[]"},{"internalType":"address[]","name":"_pairs","type":"address[]"},{"internalType":"uint256","name":"profit","type":"uint256"},{"internalType":"uint256","name":"timestamp","type":"uint256"},{"internalType":"uint256","name":"nonce","type":"uint256"},{"internalType":"bytes","name":"_signature","type":"bytes"}],"name":"ArbitrageOverdome","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"POOL","outputs":[{"internalType":"contract IPool","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"asset","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"},{"internalType":"uint256","name":"premium","type":"uint256"},{"internalType":"address","name":"initiator","type":"address"},{"internalType":"bytes","name":"params","type":"bytes"}],"name":"executeOperation","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"bytes32","name":"","type":"bytes32"}],"name":"isValidSign","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"token","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"withdrawFunds","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"},{"stateMutability":"payable","type":"receive"}] */];
+        const ENDERECO_CONTRATO = "0xf3feaE30F6D823fE03A276DF19c50cBb36A822EE"; // Seu endereço de contrato aqui
 
         async function conectarCarteira() {
             if (typeof window.ethereum !== 'undefined') {
@@ -89,6 +56,7 @@
                     enderecoCarteira = contas[0];
                     document.getElementById('status').innerText = `Status da Carteira: Conectado (${enderecoCarteira})`;
                     contratoArbitragem = new web3.eth.Contract(ABI_CONTRATO, ENDERECO_CONTRATO);
+                    console.log("Carteira conectada com sucesso");
                 } catch (error) {
                     console.error("Erro ao conectar carteira:", error);
                 }
@@ -98,8 +66,8 @@
         }
 
         async function executarArbitragem() {
-            if (!contratoArbitragem) {
-                alert("Por favor, conecte sua carteira primeiro.");
+            if (!contratoArbitragem || !enderecoCarteira) {
+                console.error("Carteira não conectada ou contrato não inicializado");
                 return;
             }
 
@@ -109,18 +77,19 @@
             const quantidadeFlashLoan = document.getElementById('quantidadeFlashLoan').value;
 
             try {
+                console.log("Iniciando execução de arbitragem...");
                 const estimativaGas = await contratoArbitragem.methods.executarArbitragem(
                     web3.utils.toWei(quantidadeFlashLoan, 'ether'),
-                    web3.utils.toWei(lucroMinimo, 'ether'),
-                    web3.utils.toWei(slippageMaximo, 'ether')
+                    web3.utils.toWei(lucroMinimo.toString(), 'ether'),
+                    web3.utils.toWei(slippageMaximo.toString(), 'ether')
                 ).estimateGas({ from: enderecoCarteira });
 
-                const precoGasWeb3 = web3.utils.toWei(precoMaximoGas, 'gwei');
+                const precoGasWeb3 = web3.utils.toWei(precoMaximoGas.toString(), 'gwei');
 
                 const result = await contratoArbitragem.methods.executarArbitragem(
                     web3.utils.toWei(quantidadeFlashLoan, 'ether'),
-                    web3.utils.toWei(lucroMinimo, 'ether'),
-                    web3.utils.toWei(slippageMaximo, 'ether')
+                    web3.utils.toWei(lucroMinimo.toString(), 'ether'),
+                    web3.utils.toWei(slippageMaximo.toString(), 'ether')
                 ).send({
                     from: enderecoCarteira,
                     gas: estimativaGas,
@@ -149,6 +118,8 @@
             if (intervalId) {
                 clearInterval(intervalId);
             }
+            console.log("Iniciando arbitragem automática...");
+            executarArbitragem(); // Execute imediatamente
             intervalId = setInterval(executarArbitragem, 5000);
             console.log("Arbitragem automática iniciada");
         }
@@ -162,7 +133,7 @@
         }
 
         async function retirarLucros() {
-            if (!contratoArbitragem) {
+            if (!contratoArbitragem || !enderecoCarteira) {
                 alert("Por favor, conecte sua carteira primeiro.");
                 return;
             }
