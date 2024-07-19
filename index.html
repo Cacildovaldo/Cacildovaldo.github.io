@@ -49,6 +49,8 @@
             margin-top: 20px;
             border-top: 1px solid #ccc;
             padding-top: 10px;
+            max-height: 200px;
+            overflow-y: auto;
         }
     </style>
 </head>
@@ -122,11 +124,14 @@
 
             try {
                 adicionarLog("Iniciando execução de arbitragem...");
+                
                 const estimativaGas = await contratoArbitragem.methods.executarArbitragem(
                     web3.utils.toWei(quantidadeFlashLoan, 'ether'),
                     web3.utils.toWei(lucroMinimo, 'ether'),
                     web3.utils.toWei(slippageMaximo, 'ether')
                 ).estimateGas({ from: enderecoCarteira });
+
+                adicionarLog(`Estimativa de gás: ${estimativaGas}`);
 
                 const precoGasWeb3 = web3.utils.toWei(precoMaximoGas, 'gwei');
 
@@ -136,13 +141,21 @@
                     web3.utils.toWei(slippageMaximo, 'ether')
                 ).send({
                     from: enderecoCarteira,
-                    gas: estimativaGas,
+                    gas: Math.floor(estimativaGas * 1.2), // Aumentando o limite de gás em 20%
                     gasPrice: precoGasWeb3
                 });
                 adicionarLog("Arbitragem executada com sucesso. Hash da transação: " + result.transactionHash);
             } catch (error) {
                 console.error("Erro ao executar arbitragem:", error);
-                adicionarLog("Erro ao executar arbitragem: " + error.message);
+                if (error.message.includes("execution reverted")) {
+                    adicionarLog("Erro: A execução do contrato foi revertida. Possíveis causas:");
+                    adicionarLog("1. Condições de arbitragem não atendidas");
+                    adicionarLog("2. Saldo insuficiente para taxas de gás");
+                    adicionarLog("3. Slippage muito baixo");
+                    adicionarLog("Verifique as configurações e tente novamente.");
+                } else {
+                    adicionarLog("Erro ao executar arbitragem: " + error.message);
+                }
             }
         }
 
@@ -150,8 +163,8 @@
             if (intervalId) {
                 clearInterval(intervalId);
             }
-            intervalId = setInterval(executarArbitragem, 5000);
-            adicionarLog("Arbitragem automática iniciada. Intervalo: 5 segundos.");
+            intervalId = setInterval(executarArbitragem, 30000); // Aumentando o intervalo para 30 segundos
+            adicionarLog("Arbitragem automática iniciada. Intervalo: 30 segundos.");
         }
 
         function pararArbitragem() {
@@ -167,6 +180,7 @@
             const logItem = document.createElement('li');
             logItem.textContent = new Date().toLocaleTimeString() + " - " + mensagem;
             logList.appendChild(logItem);
+            logList.scrollTop = logList.scrollHeight;
         }
     </script>
 </body>
