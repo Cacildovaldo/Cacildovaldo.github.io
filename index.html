@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sistema de Arbitragem DeFi Automatizado com Flash Loans</title>
-<style>
+    <style>
         body {
             font-family: Arial, sans-serif;
             margin: 0;
@@ -122,79 +122,129 @@
         let intervalId;
         let gasEstimado;
         let gasPrice;
+        let usdcContract;
+        const USDC_CONTRACT_ADDRESS = "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174"; // USDC em Polygon
 
         const ABI_CONTRATO = [{"inputs":[{"internalType":"address","name":"_flashLoanProvider","type":"address"},{"internalType":"address","name":"_uniswapRouter","type":"address"},{"internalType":"address","name":"_sushiswapRouter","type":"address"},{"internalType":"address","name":"_quickswapRouter","type":"address"}],"stateMutability":"nonpayable","type":"constructor"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"previousOwner","type":"address"},{"indexed":true,"internalType":"address","name":"newOwner","type":"address"}],"name":"OwnershipTransferred","type":"event"},{"inputs":[{"internalType":"uint256","name":"amount","type":"uint256"},{"internalType":"uint256","name":"minProfitPercentage","type":"uint256"},{"internalType":"uint256","name":"maxSlippage","type":"uint256"}],"name":"executarArbitragem","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"owner","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"renounceOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"newOwner","type":"address"}],"name":"transferOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"withdrawProfits","outputs":[],"stateMutability":"nonpayable","type":"function"}];
-        const ENDERECO_CONTRATO = "0xf3feaE30F6D823fE03A276DF19c50cBb36A822EE";
+
+        window.addEventListener('load', async () => {
+            if (typeof window.ethereum !== 'undefined') {
+                web3 = new Web3(window.ethereum);
+                try {
+                    await ethereum.request({ method: 'eth_requestAccounts' });
+                    enderecoCarteira = (await web3.eth.getAccounts())[0];
+                    document.getElementById('status').innerText = `Status da Carteira: Conectado (${enderecoCarteira})`;
+
+                    // Inicializar contrato de arbitragem
+                    contratoArbitragem = new web3.eth.Contract(ABI_CONTRATO, "0xf3feaE30F6D823fE03A276DF19c50cBb36A822EE");
+                    usdcContract = new web3.eth.Contract([
+                        {
+                            "constant": true,
+                            "inputs": [],
+                            "name": "balanceOf",
+                            "outputs": [
+                                {
+                                    "name": "",
+                                    "type": "uint256"
+                                }
+                            ],
+                            "payable": false,
+                            "stateMutability": "view",
+                            "type": "function"
+                        },
+                        {
+                            "constant": false,
+                            "inputs": [
+                                {
+                                    "name": "_spender",
+                                    "type": "address"
+                                },
+                                {
+                                    "name": "_value",
+                                    "type": "uint256"
+                                }
+                            ],
+                            "name": "approve",
+                            "outputs": [
+                                {
+                                    "name": "",
+                                    "type": "bool"
+                                }
+                            ],
+                            "payable": false,
+                            "stateMutability": "nonpayable",
+                            "type": "function"
+                        }
+                    ], USDC_CONTRACT_ADDRESS);
+
+                    // Verificar saldos iniciais
+                    await verificarSaldos();
+                } catch (error) {
+                    console.error("Erro ao conectar com a carteira:", error);
+                    adicionarLog("Erro ao conectar com a carteira: " + error.message);
+                }
+            } else {
+                adicionarLog("MetaMask não detectado. Por favor, instale MetaMask.");
+            }
+        });
 
         async function conectarCarteira() {
             if (typeof window.ethereum !== 'undefined') {
+                web3 = new Web3(window.ethereum);
                 try {
-                    await window.ethereum.request({ method: 'eth_requestAccounts' });
-                    web3 = new Web3(window.ethereum);
-                    const contas = await web3.eth.getAccounts();
-                    enderecoCarteira = contas[0];
-                    
-                    // Verificar se está na rede Polygon
-                    const networkId = await web3.eth.net.getId();
-                    if (networkId !== 137) { // 137 é o ID da rede Polygon Mainnet
-                        await window.ethereum.request({
-                            method: 'wallet_switchEthereumChain',
-                            params: [{ chainId: '0x89' }], // chainId para Polygon Mainnet
-                        });
-                    }
-                    
+                    await ethereum.request({ method: 'eth_requestAccounts' });
+                    enderecoCarteira = (await web3.eth.getAccounts())[0];
                     document.getElementById('status').innerText = `Status da Carteira: Conectado (${enderecoCarteira})`;
-                    contratoArbitragem = new web3.eth.Contract(ABI_CONTRATO, ENDERECO_CONTRATO);
-                    adicionarLog("Carteira conectada com sucesso à rede Polygon.");
-                    await verificarSaldos();
                 } catch (error) {
-                    console.error("Erro ao conectar carteira:", error);
-                    adicionarLog("Erro ao conectar carteira: " + error.message);
+                    console.error("Erro ao conectar com a carteira:", error);
+                    adicionarLog("Erro ao conectar com a carteira: " + error.message);
                 }
             } else {
-                alert("Por favor, instale a MetaMask!");
-                adicionarLog("MetaMask não detectada. Por favor, instale-a.");
+                adicionarLog("MetaMask não detectado. Por favor, instale MetaMask.");
             }
         }
 
         async function verificarSaldos() {
-            if (!web3 || !enderecoCarteira) {
-                adicionarLog("Por favor, conecte sua carteira primeiro.");
-                return false;
-            }
-
             try {
                 const saldoCarteira = await web3.eth.getBalance(enderecoCarteira);
-                const saldoCarteiraMatic = web3.utils.fromWei(saldoCarteira, 'ether');
-                document.getElementById('saldoCarteira').innerText = `Saldo da Carteira: ${saldoCarteiraMatic} MATIC`;
+                document.getElementById('saldoCarteira').innerText = `Saldo da Carteira: ${web3.utils.fromWei(saldoCarteira, 'ether')} MATIC`;
 
-                const saldoContrato = await web3.eth.getBalance(ENDERECO_CONTRATO);
-                const saldoContratoMatic = web3.utils.fromWei(saldoContrato, 'ether');
-                document.getElementById('saldoContrato').innerText = `Saldo do Contrato: ${saldoContratoMatic} MATIC`;
+                const saldoUSDC = await usdcContract.methods.balanceOf(enderecoCarteira).call();
+                adicionarLog(`Saldo de USDC na carteira: ${web3.utils.fromWei(saldoUSDC, 'mwei')} USDC`);
 
+                document.getElementById('saldoContrato').innerText = `Saldo do Contrato: N/A`;
                 adicionarLog("Saldos atualizados com sucesso.");
-                return true;
             } catch (error) {
                 console.error("Erro ao verificar saldos:", error);
                 adicionarLog("Erro ao verificar saldos: " + error.message);
-                return false;
+            }
+        }
+
+        async function aprovarContrato() {
+            const quantidadeFlashLoan = document.getElementById('quantidadeFlashLoan').value;
+            try {
+                await usdcContract.methods.approve(contratoArbitragem.options.address, web3.utils.toWei(quantidadeFlashLoan, 'mwei')).send({ from: enderecoCarteira });
+                adicionarLog("Aprovação do contrato de arbitragem para gastar USDC realizada com sucesso.");
+            } catch (error) {
+                console.error("Erro ao aprovar contrato:", error);
+                adicionarLog("Erro ao aprovar contrato: " + error.message);
             }
         }
 
         async function estimarGas() {
+            const quantidadeFlashLoan = document.getElementById('quantidadeFlashLoan').value;
             const lucroMinimo = document.getElementById('lucroMinimo').value;
             const slippageMaximo = document.getElementById('slippageMaximo').value;
-            const quantidadeFlashLoan = document.getElementById('quantidadeFlashLoan').value;
 
             try {
                 gasEstimado = await contratoArbitragem.methods.executarArbitragem(
-                    web3.utils.toWei(quantidadeFlashLoan, 'mwei'), // Supondo que USDC tenha 6 decimais
+                    web3.utils.toWei(quantidadeFlashLoan, 'mwei'),
                     web3.utils.toWei(lucroMinimo, 'ether'),
                     web3.utils.toWei(slippageMaximo, 'ether')
                 ).estimateGas({ from: enderecoCarteira });
-                
+
                 gasPrice = await web3.eth.getGasPrice();
-                
+
                 return true;
             } catch (error) {
                 console.error("Erro ao estimar gás:", error);
@@ -240,7 +290,7 @@
                 ).send({ from: enderecoCarteira, gas: gasEstimado, gasPrice: gasPrice });
 
                 adicionarLog("Arbitragem executada com sucesso. Transação: " + result.transactionHash);
-                
+
                 // Atualizar os saldos após a execução da arbitragem
                 await verificarSaldos();
 
