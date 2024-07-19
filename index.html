@@ -52,6 +52,25 @@
             max-height: 200px;
             overflow-y: auto;
         }
+        #modal {
+            display: none;
+            position: fixed;
+            z-index: 1;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.4);
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: 15% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 80%;
+            max-width: 500px;
+        }
     </style>
 </head>
 <body>
@@ -81,6 +100,17 @@
         <div id="operacoesLog">
             <h3>Log de Operações Automáticas</h3>
             <ul id="logList"></ul>
+        </div>
+    </div>
+
+    <div id="modal" class="modal">
+        <div class="modal-content">
+            <h2>Taxa de Gás Elevada</h2>
+            <p>A taxa de gás estimada para esta transação é considerada elevada:</p>
+            <p id="gasEstimadoModal"></p>
+            <p>Deseja prosseguir com a transação?</p>
+            <button onclick="confirmarTransacao()">Confirmar</button>
+            <button onclick="cancelarTransacao()">Cancelar</button>
         </div>
     </div>
 
@@ -170,6 +200,28 @@
                     return;
                 }
 
+                // Verificar se a taxa de gás é elevada
+                const gasPrice = await web3.eth.getGasPrice();
+                if (BigInt(gasPrice) > BigInt(web3.utils.toWei(precoMaximoGas, 'gwei'))) {
+                    const custoEstimadoMatic = web3.utils.fromWei(BigInt(gasEstimado) * BigInt(gasPrice), 'ether');
+                    document.getElementById('gasEstimadoModal').innerText = `Custo estimado: ${custoEstimadoMatic} MATIC`;
+                    document.getElementById('modal').style.display = 'block';
+                    return;
+                }
+
+                await enviarTransacao(gasEstimado, precoMaximoGas, quantidadeFlashLoan, lucroMinimo, slippageMaximo);
+            } catch (error) {
+                console.error("Erro ao executar arbitragem:", error);
+                adicionarLog("Erro ao executar arbitragem: " + error.message);
+                if (error.message.includes("execution reverted")) {
+                    adicionarLog("Tentando ajustar parâmetros e reenviar transação...");
+                    await tentarReajustarTransacao(quantidadeFlashLoan, lucroMinimo, slippageMaximo);
+                }
+            }
+        }
+
+        async function enviarTransacao(gasEstimado, precoMaximoGas, quantidadeFlashLoan, lucroMinimo, slippageMaximo) {
+            try {
                 const result = await contratoArbitragem.methods.executarArbitragem(
                     web3.utils.toWei(quantidadeFlashLoan, 'ether'),
                     web3.utils.toWei(lucroMinimo, 'ether'),
@@ -182,16 +234,29 @@
                 adicionarLog("Arbitragem executada com sucesso. Hash da transação: " + result.transactionHash);
                 await verificarSaldos(); // Atualizar saldos após a execução
             } catch (error) {
-                console.error("Erro ao executar arbitragem:", error);
-                if (error.message.includes("execution reverted")) {
-                    adicionarLog("Erro: A execução do contrato foi revertida. Possíveis causas:");
-                    adicionarLog("1. Condições de arbitragem não atendidas");
-                    adicionarLog("2. Saldo insuficiente para taxas de gás");
-                    adicionarLog("3. Slippage muito baixo");
-                    adicionarLog("Verifique as configurações e tente novamente.");
-                } else {
-                    adicionarLog("Erro ao executar arbitragem: " + error.message);
-                }
+                throw error;
+            }
+        }
+
+        async function tentarReajustarTransacao(quantidadeFlashLoan, lucroMinimo, slippageMaximo) {
+            // Ajustar parâmetros e tentar novamente
+            const novoLucroMinimo = (parseFloat(lucroMinimo) * 0.9).toString(); // Reduz o lucro mínimo em 10%
+            const novoSlippage = (parseFloat(slippageMaximo) * 1.1).toString(); // Aumenta o slippage em 10%
+
+            try {
+                await enviarTransacao(
+                    await contratoArbitragem.methods.executarArbitragem(
+                        web3.utils.toWei(quantidadeFlashLoan, 'ether'),
+                        web3.utils.toWei(novoLucroMinimo, 'ether'),
+                        web3.utils.toWei(novoSlippage, 'ether')
+                    ).estimateGas({ from: enderecoCarteira }),
+                    document.getElementById('precoMaximoGas').value,
+                    quantidadeFlashLoan,
+                    novoLucroMinimo,
+                    novoSlippage
+                );
+            } catch (error) {
+                adicionarLog("Falha ao reajustar transação: " + error.message);
             }
         }
 
@@ -213,11 +278,4 @@
 
         function adicionarLog(mensagem) {
             const logList = document.getElementById('logList');
-            const logItem = document.createElement('li');
-            logItem.textContent = new Date().toLocaleTimeString() + " - " + mensagem;
-            logList.appendChild(logItem);
-            logList.scrollTop = logList.scrollHeight;
-        }
-    </script>
-</body>
-</html>
+            const logItem = document.
