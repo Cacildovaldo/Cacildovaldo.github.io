@@ -1,331 +1,143 @@
 <!DOCTYPE html>
-<html lang="pt-br">
+<html lang="pt">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema de Arbitragem DeFi Automatizado com Flash Loans</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 20px;
-            background-color: #f0f0f0;
-        }
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
-            background-color: white;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 0 10px rgba(0,0,0,0.1);
-        }
-        h1, h2 {
-            color: #333;
-        }
-        button {
-            background-color: #4CAF50;
-            border: none;
-            color: white;
-            padding: 10px 20px;
-            text-align: center;
-            text-decoration: none;
-            display: inline-block;
-            font-size: 16px;
-            margin: 4px 2px;
-            cursor: pointer;
-            border-radius: 5px;
-        }
-        input[type="number"] {
-            width: 100%;
-            padding: 8px;
-            margin: 5px 0;
-            box-sizing: border-box;
-        }
-        #status, #saldoCarteira, #saldoContrato {
-            font-weight: bold;
-            margin-bottom: 10px;
-        }
-        #operacoesLog {
-            margin-top: 20px;
-            border-top: 1px solid #ccc;
-            padding-top: 10px;
-            max-height: 200px;
-            overflow-y: auto;
-        }
-        #modal {
-            display: none;
-            position: fixed;
-            z-index: 1;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            overflow: auto;
-            background-color: rgba(0,0,0,0.4);
-        }
-        .modal-content {
-            background-color: #fefefe;
-            margin: 15% auto;
-            padding: 20px;
-            border: 1px solid #888;
-            width: 80%;
-            max-width: 500px;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>Sistema de Arbitragem DeFi Automatizado com Flash Loans</h1>
-        <div id="status">Status da Carteira: Desconectado</div>
-        <div id="saldoCarteira">Saldo da Carteira: --</div>
-        <div id="saldoContrato">Saldo do Contrato: --</div>
-        <button onclick="conectarCarteira()">Conectar Carteira</button>
-        <button onclick="verificarSaldos()">Verificar Saldos</button>
-        <button onclick="iniciarArbitragem()">Iniciar Arbitragem Automática</button>
-        <button onclick="pararArbitragem()">Parar Arbitragem Automática</button>
-
-        <h2>Configurações</h2>
-        <label for="lucroMinimo">Lucro Mínimo (%):</label>
-        <input type="number" id="lucroMinimo" min="0" step="0.1" value="0.5">
-
-        <label for="precoMaximoGas">Preço Máximo de Gás (Gwei):</label>
-        <input type="number" id="precoMaximoGas" min="0" step="1" value="100">
-
-        <label for="slippageMaximo">Slippage Máximo (%):</label>
-        <input type="number" id="slippageMaximo" min="0" step="0.1" value="1">
-
-        <label for="quantidadeFlashLoan">Quantidade do Flash Loan (USDC):</label>
-        <input type="number" id="quantidadeFlashLoan" min="0" step="100" value="10000">
-
-        <div id="operacoesLog">
-            <h3>Log de Operações Automáticas</h3>
-            <ul id="logList"></ul>
-        </div>
-    </div>
-
-    <div id="modal" class="modal">
-        <div class="modal-content">
-            <h2>Taxa de Gás Elevada</h2>
-            <p>A taxa de gás estimada para esta transação é considerada elevada:</p>
-            <p id="gasEstimadoModal"></p>
-            <p>Deseja prosseguir com a transação?</p>
-            <button onclick="confirmarTransacao()">Confirmar</button>
-            <button onclick="cancelarTransacao()">Cancelar</button>
-        </div>
-    </div>
-
-    <script src="https://cdn.jsdelivr.net/npm/web3@1.5.2/dist/web3.min.js"></script>
+    <title>Arbitragem DeFi</title>
+    <script src="https://cdn.jsdelivr.net/npm/web3@latest/dist/web3.min.js"></script>
     <script>
-        let web3;
-        let contratoArbitragem;
-        let enderecoCarteira;
-        let intervalId;
-        let gasEstimado;
-        let gasPrice;
-        let usdcContract;
-        const USDC_CONTRACT_ADDRESS = "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174"; // USDC em Polygon
+        // Inicializa o Web3 com o provedor do Polygon
+        const Web3 = require('web3');
+        const web3 = new Web3('https://polygon-rpc.com'); // Polygon RPC URL
 
-        const ABI_CONTRATO = [{"inputs":[{"internalType":"address","name":"_flashLoanProvider","type":"address"},{"internalType":"address","name":"_uniswapRouter","type":"address"},{"internalType":"address","name":"_sushiswapRouter","type":"address"},{"internalType":"address","name":"_quickswapRouter","type":"address"}],"stateMutability":"nonpayable","type":"constructor"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"previousOwner","type":"address"},{"indexed":true,"internalType":"address","name":"newOwner","type":"address"}],"name":"OwnershipTransferred","type":"event"},{"inputs":[{"internalType":"uint256","name":"amount","type":"uint256"},{"internalType":"uint256","name":"minProfitPercentage","type":"uint256"},{"internalType":"uint256","name":"maxSlippage","type":"uint256"}],"name":"executarArbitragem","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"owner","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"renounceOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"newOwner","type":"address"}],"name":"transferOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"withdrawProfits","outputs":[],"stateMutability":"nonpayable","type":"function"}];
+        const UNISWAP_ROUTER_ADDRESS = '0xa5E0829CaCEd8fFDD4De3c43696c57F7D7A678ff';
+        const USDC_ADDRESS = '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174';
+        const DAI_ADDRESS = '0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063';
+        const FLASH_LOAN_CONTRACT = '0xf3feaE30F6D823fE03A276DF19c50cBb36A822EE';
 
-        window.addEventListener('load', async () => {
-            if (typeof window.ethereum !== 'undefined') {
-                web3 = new Web3(window.ethereum);
-                try {
-                    await ethereum.request({ method: 'eth_requestAccounts' });
-                    enderecoCarteira = (await web3.eth.getAccounts())[0];
-                    document.getElementById('status').innerText = `Status da Carteira: Conectado (${enderecoCarteira})`;
+        const FLASH_LOAN_ABI = [{"inputs":[{"internalType":"address","name":"_addressProvider","type":"address"}],"stateMutability":"nonpayable","type":"constructor"},{"inputs":[],"name":"ADDRESSES_PROVIDER","outputs":[{"internalType":"contract IPoolAddressesProvider","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"_token","type":"address"},{"internalType":"uint256","name":"_amount","type":"uint256"},{"internalType":"uint8[]","name":"_dexList","type":"uint8[]"},{"internalType":"address[]","name":"_pairs","type":"address[]"},{"internalType":"uint256","name":"profit","type":"uint256"},{"internalType":"uint256","name":"timestamp","type":"uint256"},{"internalType":"uint256","name":"nonce","type":"uint256"},{"internalType":"bytes","name":"_signature","type":"bytes"}],"name":"ArbitrageOverdome","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"POOL","outputs":[{"internalType":"contract IPool","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"asset","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"},{"internalType":"uint256","name":"premium","type":"uint256"},{"internalType":"address","name":"initiator","type":"address"},{"internalType":"bytes","name":"params","type":"bytes"}],"name":"executeOperation","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"bytes32","name":"","type":"bytes32"}],"name":"isValidSign","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"token","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"withdrawFunds","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"},{"stateMutability":"payable","type":"receive"}];
+        const UNISWAP_ABI = [{"inputs":[{"internalType":"address","name":"_factory","type":"address"},{"internalType":"address","name":"_WETH9","type":"address"}],"stateMutability":"nonpayable","type":"constructor"},{"inputs":[],"name":"WETH9","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[{"components":[{"internalType":"bytes","name":"path","type":"bytes"},{"internalType":"address","name":"recipient","type":"address"},{"internalType":"uint256","name":"deadline","type":"uint256"},{"internalType":"uint256","name":"amountIn","type":"uint256"},{"internalType":"uint256","name":"amountOutMinimum","type":"uint256"}],"internalType":"struct ISwapRouter.ExactInputParams","name":"params","type":"tuple"}],"name":"exactInput","outputs":[{"internalType":"uint256","name":"amountOut","type":"uint256"}],"stateMutability":"payable","type":"function"},{"inputs":[{"components":[{"internalType":"address","name":"tokenIn","type":"address"},{"internalType":"address","name":"tokenOut","type":"address"},{"internalType":"uint24","name":"fee","type":"uint24"},{"internalType":"address","name":"recipient","type":"address"},{"internalType":"uint256","name":"deadline","type":"uint256"},{"internalType":"uint256","name":"amountIn","type":"uint256"},{"internalType":"uint256","name":"amountOutMinimum","type":"uint256"},{"internalType":"uint160","name":"sqrtPriceLimitX96","type":"uint160"}],"internalType":"struct ISwapRouter.ExactInputSingleParams","name":"params","type":"tuple"}],"name":"exactInputSingle","outputs":[{"internalType":"uint256","name":"amountOut","type":"uint256"}],"stateMutability":"payable","type":"function"},{"inputs":[{"components":[{"internalType":"bytes","name":"path","type":"bytes"},{"internalType":"address","name":"recipient","type":"address"},{"internalType":"uint256","name":"deadline","type":"uint256"},{"internalType":"uint256","name":"amountOut","type":"uint256"},{"internalType":"uint256","name":"amountInMaximum","type":"uint256"}],"internalType":"struct ISwapRouter.ExactOutputParams","name":"params","type":"tuple"}],"name":"exactOutput","outputs":[{"internalType":"uint256","name":"amountIn","type":"uint256"}],"stateMutability":"payable","type":"function"},{"inputs":[{"components":[{"internalType":"address","name":"tokenIn","type":"address"},{"internalType":"address","name":"tokenOut","type":"address"},{"internalType":"uint24","name":"fee","type":"uint24"},{"internalType":"address","name":"recipient","type":"address"},{"internalType":"uint256","name":"deadline","type":"uint256"},{"internalType":"uint256","name":"amountOut","type":"uint256"},{"internalType":"uint256","name":"amountInMaximum","type":"uint256"},{"internalType":"uint160","name":"sqrtPriceLimitX96","type":"uint160"}],"internalType":"struct ISwapRouter.ExactOutputSingleParams","name":"params","type":"tuple"}],"name":"exactOutputSingle","outputs":[{"internalType":"uint256","name":"amountIn","type":"uint256"}],"stateMutability":"payable","type":"function"},{"inputs":[],"name":"factory","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"bytes[]","name":"data","type":"bytes[]"}],"name":"multicall","outputs":[{"internalType":"bytes[]","name":"results","type":"bytes[]"}],"stateMutability":"payable","type":"function"},{"inputs":[],"name":"refundETH","outputs":[],"stateMutability":"payable","type":"function"},{"inputs":[{"internalType":"address","name":"token","type":"address"},{"internalType":"uint256","name":"value","type":"uint256"},{"internalType":"uint256","name":"deadline","type":"uint256"},{"internalType":"uint8","name":"v","type":"uint8"},{"internalType":"bytes32","name":"r","type":"bytes32"},{"internalType":"bytes32","name":"s","type":"bytes32"}],"name":"selfPermit","outputs":[],"stateMutability":"payable","type":"function"},{"inputs":[{"internalType":"address","name":"token","type":"address"},{"internalType":"uint256","name":"nonce","type":"uint256"},{"internalType":"uint256","name":"expiry","type":"uint256"},{"internalType":"uint8","name":"v","type":"uint8"},{"internalType":"bytes32","name":"r","type":"bytes32"},{"internalType":"bytes32","name":"s","type":"bytes32"}],"name":"selfPermitAllowed","outputs":[],"stateMutability":"payable","type":"function"},{"inputs":[{"internalType":"address","name":"token","type":"address"},{"internalType":"uint256","name":"nonce","type":"uint256"},{"internalType":"uint256","name":"expiry","type":"uint256"},{"internalType":"uint8","name":"v","type":"uint8"},{"internalType":"bytes32","name":"r","type":"bytes32"},{"internalType":"bytes32","name":"s","type":"bytes32"}],"name":"selfPermitAllowedIfNecessary","outputs":[],"stateMutability":"payable","type":"function"},{"inputs":[{"internalType":"address","name":"token","type":"address"},{"internalType":"uint256","name":"value","type":"uint256"},{"internalType":"uint256","name":"deadline","type":"uint256"},{"internalType":"uint8","name":"v","type":"uint8"},{"internalType":"bytes32","name":"r","type":"bytes32"},{"internalType":"bytes32","name":"s","type":"bytes32"}],"name":"selfPermitIfNecessary","outputs":[],"stateMutability":"payable","type":"function"},{"inputs":[{"internalType":"address","name":"token","type":"address"},{"internalType":"uint256","name":"amountMinimum","type":"uint256"},{"internalType":"address","name":"recipient","type":"address"}],"name":"sweepToken","outputs":[],"stateMutability":"payable","type":"function"},{"inputs":[{"internalType":"address","name":"token","type":"address"},{"internalType":"uint256","name":"amountMinimum","type":"uint256"},{"internalType":"address","name":"recipient","type":"address"},{"internalType":"uint256","name":"feeBips","type":"uint256"},{"internalType":"address","name":"feeRecipient","type":"address"}],"name":"sweepTokenWithFee","outputs":[],"stateMutability":"payable","type":"function"},{"inputs":[{"internalType":"int256","name":"amount0Delta","type":"int256"},{"internalType":"int256","name":"amount1Delta","type":"int256"},{"internalType":"bytes","name":"_data","type":"bytes"}],"name":"uniswapV3SwapCallback","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"uint256","name":"amountMinimum","type":"uint256"},{"internalType":"address","name":"recipient","type":"address"}],"name":"unwrapWETH9","outputs":[],"stateMutability":"payable","type":"function"},{"inputs":[{"internalType":"uint256","name":"amountMinimum","type":"uint256"},{"internalType":"address","name":"recipient","type":"address"},{"internalType":"uint256","name":"feeBips","type":"uint256"},{"internalType":"address","name":"feeRecipient","type":"address"}],"name":"unwrapWETH9WithFee","outputs":[],"stateMutability":"payable","type":"function"},{"stateMutability":"payable","type":"receive"}];
+        const QUICKSWAP_ABI = [{"inputs":[{"internalType":"address","name":"_factory","type":"address"},{"internalType":"address","name":"_WNativeToken","type":"address"},{"internalType":"address","name":"_poolDeployer","type":"address"}],"stateMutability":"nonpayable","type":"constructor"},{"inputs":[],"name":"WNativeToken","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"int256","name":"amount0Delta","type":"int256"},{"internalType":"int256","name":"amount1Delta","type":"int256"},{"internalType":"bytes","name":"_data","type":"bytes"}],"name":"algebraSwapCallback","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"components":[{"internalType":"bytes","name":"path","type":"bytes"},{"internalType":"address","name":"recipient","type":"address"},{"internalType":"uint256","name":"deadline","type":"uint256"},{"internalType":"uint256","name":"amountIn","type":"uint256"},{"internalType":"uint256","name":"amountOutMinimum","type":"uint256"}],"internalType":"struct ISwapRouter.ExactInputParams","name":"params","type":"tuple"}],"name":"exactInput","outputs":[{"internalType":"uint256","name":"amountOut","type":"uint256"}],"stateMutability":"payable","type":"function"},{"inputs":[{"components":[{"internalType":"address","name":"tokenIn","type":"address"},{"internalType":"address","name":"tokenOut","type":"address"},{"internalType":"address","name":"recipient","type":"address"},{"internalType":"uint256","name":"deadline","type":"uint256"},{"internalType":"uint256","name":"amountIn","type":"uint256"},{"internalType":"uint256","name":"amountOutMinimum","type":"uint256"},{"internalType":"uint160","name":"limitSqrtPrice","type":"uint160"}],"internalType":"struct ISwapRouter.ExactInputSingleParams","name":"params","type":"tuple"}],"name":"exactInputSingle","outputs":[{"internalType":"uint256","name":"amountOut","type":"uint256"}],"stateMutability":"payable","type":"function"},{"inputs":[{"components":[{"internalType":"address","name":"tokenIn","type":"address"},{"internalType":"address","name":"tokenOut","type":"address"},{"internalType":"address","name":"recipient","type":"address"},{"internalType":"uint256","name":"deadline","type":"uint256"},{"internalType":"uint256","name":"amountIn","type":"uint256"},{"internalType":"uint256","name":"amountOutMinimum","type":"uint256"},{"internalType":"uint160","name":"limitSqrtPrice","type":"uint160"}],"internalType":"struct ISwapRouter.ExactInputSingleParams","name":"params","type":"tuple"}],"name":"exactInputSingleSupportingFeeOnTransferTokens","outputs":[{"internalType":"uint256","name":"amountOut","type":"uint256"}],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"components":[{"internalType":"bytes","name":"path","type":"bytes"},{"internalType":"address","name":"recipient","type":"address"},{"internalType":"uint256","name":"deadline","type":"uint256"},{"internalType":"uint256","name":"amountOut","type":"uint256"},{"internalType":"uint256","name":"amountInMaximum","type":"uint256"}],"internalType":"struct ISwapRouter.ExactOutputParams","name":"params","type":"tuple"}],"name":"exactOutput","outputs":[{"internalType":"uint256","name":"amountIn","type":"uint256"}],"stateMutability":"payable","type":"function"},{"inputs":[{"components":[{"internalType":"address","name":"tokenIn","type":"address"},{"internalType":"address","name":"tokenOut","type":"address"},{"internalType":"uint24","name":"fee","type":"uint24"},{"internalType":"address","name":"recipient","type":"address"},{"internalType":"uint256","name":"deadline","type":"uint256"},{"internalType":"uint256","name":"amountOut","type":"uint256"},{"internalType":"uint256","name":"amountInMaximum","type":"uint256"},{"internalType":"uint160","name":"limitSqrtPrice","type":"uint160"}],"internalType":"struct ISwapRouter.ExactOutputSingleParams","name":"params","type":"tuple"}],"name":"exactOutputSingle","outputs":[{"internalType":"uint256","name":"amountIn","type":"uint256"}],"stateMutability":"payable","type":"function"},{"inputs":[],"name":"factory","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"bytes[]","name":"data","type":"bytes[]"}],"name":"multicall","outputs":[{"internalType":"bytes[]","name":"results","type":"bytes[]"}],"stateMutability":"payable","type":"function"},{"inputs":[],"name":"poolDeployer","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"refundNativeToken","outputs":[],"stateMutability":"payable","type":"function"},{"inputs":[{"internalType":"address","name":"token","type":"address"},{"internalType":"uint256","name":"value","type":"uint256"},{"internalType":"uint256","name":"deadline","type":"uint256"},{"internalType":"uint8","name":"v","type":"uint8"},{"internalType":"bytes32","name":"r","type":"bytes32"},{"internalType":"bytes32","name":"s","type":"bytes32"}],"name":"selfPermit","outputs":[],"stateMutability":"payable","type":"function"},{"inputs":[{"internalType":"address","name":"token","type":"address"},{"internalType":"uint256","name":"nonce","type":"uint256"},{"internalType":"uint256","name":"expiry","type":"uint256"},{"internalType":"uint8","name":"v","type":"uint8"},{"internalType":"bytes32","name":"r","type":"bytes32"},{"internalType":"bytes32","name":"s","type":"bytes32"}],"name":"selfPermitAllowed","outputs":[],"stateMutability":"payable","type":"function"},{"inputs":[{"internalType":"address","name":"token","type":"address"},{"internalType":"uint256","name":"nonce","type":"uint256"},{"internalType":"uint256","name":"expiry","type":"uint256"},{"internalType":"uint8","name":"v","type":"uint8"},{"internalType":"bytes32","name":"r","type":"bytes32"},{"internalType":"bytes32","name":"s","type":"bytes32"}],"name":"selfPermitAllowedIfNecessary","outputs":[],"stateMutability":"payable","type":"function"},{"inputs":[{"internalType":"address","name":"token","type":"address"},{"internalType":"uint256","name":"value","type":"uint256"},{"internalType":"uint256","name":"deadline","type":"uint256"},{"internalType":"uint8","name":"v","type":"uint8"},{"internalType":"bytes32","name":"r","type":"bytes32"},{"internalType":"bytes32","name":"s","type":"bytes32"}],"name":"selfPermitIfNecessary","outputs":[],"stateMutability":"payable","type":"function"},{"inputs":[{"internalType":"address","name":"token","type":"address"},{"internalType":"uint256","name":"amountMinimum","type":"uint256"},{"internalType":"address","name":"recipient","type":"address"}],"name":"sweepToken","outputs":[],"stateMutability":"payable","type":"function"},{"inputs":[{"internalType":"address","name":"token","type":"address"},{"internalType":"uint256","name":"amountMinimum","type":"uint256"},{"internalType":"address","name":"recipient","type":"address"},{"internalType":"uint256","name":"feeBips","type":"uint256"},{"internalType":"address","name":"feeRecipient","type":"address"}],"name":"sweepTokenWithFee","outputs":[],"stateMutability":"payable","type":"function"},{"inputs":[{"internalType":"uint256","name":"amountMinimum","type":"uint256"},{"internalType":"address","name":"recipient","type":"address"}],"name":"unwrapWNativeToken","outputs":[],"stateMutability":"payable","type":"function"},{"inputs":[{"internalType":"uint256","name":"amountMinimum","type":"uint256"},{"internalType":"address","name":"recipient","type":"address"},{"internalType":"uint256","name":"feeBips","type":"uint256"},{"internalType":"address","name":"feeRecipient","type":"address"}],"name":"unwrapWNativeTokenWithFee","outputs":[],"stateMutability":"payable","type":"function"},{"stateMutability":"payable","type":"receive"}];
 
-                    // Inicializar contrato de arbitragem
-                    contratoArbitragem = new web3.eth.Contract(ABI_CONTRATO, "0xf3feaE30F6D823fE03A276DF19c50cBb36A822EE");
-                    usdcContract = new web3.eth.Contract([
-                        {
-                            "constant": true,
-                            "inputs": [],
-                            "name": "balanceOf",
-                            "outputs": [
-                                {
-                                    "name": "",
-                                    "type": "uint256"
-                                }
-                            ],
-                            "payable": false,
-                            "stateMutability": "view",
-                            "type": "function"
-                        },
-                        {
-                            "constant": false,
-                            "inputs": [
-                                {
-                                    "name": "_spender",
-                                    "type": "address"
-                                },
-                                {
-                                    "name": "_value",
-                                    "type": "uint256"
-                                }
-                            ],
-                            "name": "approve",
-                            "outputs": [
-                                {
-                                    "name": "",
-                                    "type": "bool"
-                                }
-                            ],
-                            "payable": false,
-                            "stateMutability": "nonpayable",
-                            "type": "function"
-                        }
-                    ], USDC_CONTRACT_ADDRESS);
+        const flashLoanContract = new web3.eth.Contract(FLASH_LOAN_ABI, FLASH_LOAN_CONTRACT);
+        const uniswapRouter = new web3.eth.Contract(UNISWAP_ABI, UNISWAP_ROUTER_ADDRESS);
 
-                    // Verificar saldos iniciais
-                    await verificarSaldos();
-                } catch (error) {
-                    console.error("Erro ao conectar com a carteira:", error);
-                    adicionarLog("Erro ao conectar com a carteira: " + error.message);
-                }
-            } else {
-                adicionarLog("MetaMask não detectado. Por favor, instale MetaMask.");
-            }
-        });
-
-        async function conectarCarteira() {
-            if (typeof window.ethereum !== 'undefined') {
-                web3 = new Web3(window.ethereum);
-                try {
-                    await ethereum.request({ method: 'eth_requestAccounts' });
-                    enderecoCarteira = (await web3.eth.getAccounts())[0];
-                    document.getElementById('status').innerText = `Status da Carteira: Conectado (${enderecoCarteira})`;
-                } catch (error) {
-                    console.error("Erro ao conectar com a carteira:", error);
-                    adicionarLog("Erro ao conectar com a carteira: " + error.message);
-                }
-            } else {
-                adicionarLog("MetaMask não detectado. Por favor, instale MetaMask.");
-            }
-        }
-
-        async function verificarSaldos() {
+        async function executarArbitragem(quantia, dexList, pairs, profit, timestamp, nonce, assinatura) {
             try {
-                const saldoCarteira = await web3.eth.getBalance(enderecoCarteira);
-                document.getElementById('saldoCarteira').innerText = `Saldo da Carteira: ${web3.utils.fromWei(saldoCarteira, 'ether')} MATIC`;
+                const gasPrice = await web3.eth.getGasPrice();
+                const gasLimit = 500000; // Ajuste conforme necessário
 
-                const saldoUSDC = await usdcContract.methods.balanceOf(enderecoCarteira).call();
-                adicionarLog(`Saldo de USDC na carteira: ${web3.utils.fromWei(saldoUSDC, 'mwei')} USDC`);
+                const tx = flashLoanContract.methods.ArbitrageOverdome(
+                    USDC_ADDRESS,
+                    quantia,
+                    dexList,
+                    pairs,
+                    profit,
+                    timestamp,
+                    nonce,
+                    assinatura
+                );
 
-                document.getElementById('saldoContrato').innerText = `Saldo do Contrato: N/A`;
-                adicionarLog("Saldos atualizados com sucesso.");
+                const data = tx.encodeABI();
+                const conta = web3.eth.accounts.privateKeyToAccount('SUA_CHAVE_PRIVADA');
+
+                const txData = {
+                    from: conta.address,
+                    to: FLASH_LOAN_CONTRACT,
+                    data: data,
+                    gas: gasLimit,
+                    gasPrice: gasPrice
+                };
+
+                const signedTx = await conta.signTransaction(txData);
+                const receipt = await web3.eth.sendSignedTransaction(signedTx.rawTransaction);
+
+                console.log('Transação confirmada:', receipt.transactionHash);
+                return receipt;
             } catch (error) {
-                console.error("Erro ao verificar saldos:", error);
-                adicionarLog("Erro ao verificar saldos: " + error.message);
+                console.error('Erro ao executar arbitragem:', error);
+                throw error;
             }
         }
 
-        async function aprovarContrato() {
-            const quantidadeFlashLoan = document.getElementById('quantidadeFlashLoan').value;
+        async function trocarTokens(tokenEntrada, tokenSaida, quantia, slippage = 0.5) {
             try {
-                await usdcContract.methods.approve(contratoArbitragem.options.address, web3.utils.toWei(quantidadeFlashLoan, 'mwei')).send({ from: enderecoCarteira });
-                adicionarLog("Aprovação do contrato de arbitragem para gastar USDC realizada com sucesso.");
+                const path = [tokenEntrada, tokenSaida];
+                const to = '0xeeA7305518ad37fe10f43Ea2701Ed8D931D221f3';
+                const deadline = Math.floor(Date.now() / 1000) + 60 * 20; // 20 minutos
+
+                const amountsOut = await uniswapRouter.methods.getAmountsOut(quantia, path).call();
+                const expectedAmountOut = amountsOut[amountsOut.length - 1];
+                const minAmountOut = web3.utils.toBN(expectedAmountOut).muln(100 - slippage).divn(100);
+
+                const tx = uniswapRouter.methods.swapExactTokensForTokens(
+                    quantia,
+                    minAmountOut,
+                    path,
+                    to,
+                    deadline
+                );
+
+                const gasPrice = await web3.eth.getGasPrice();
+                const gasLimit = 300000; // Ajuste conforme necessário
+
+                const data = tx.encodeABI();
+                const conta = web3.eth.accounts.privateKeyToAccount('6419005661a2b20565f3bc2e00de11c0daf155b3d3a626f50f27693393d5bbbc');
+
+                const txData = {
+                    from: conta.address,
+                    to: UNISWAP_ROUTER_ADDRESS,
+                    data: data,
+                    gas: gasLimit,
+                    gasPrice: gasPrice
+                };
+
+                const signedTx = await conta.signTransaction(txData);
+                const receipt = await web3.eth.sendSignedTransaction(signedTx.rawTransaction);
+
+                console.log('Troca concluída:', receipt.transactionHash);
+                return receipt;
             } catch (error) {
-                console.error("Erro ao aprovar contrato:", error);
-                adicionarLog("Erro ao aprovar contrato: " + error.message);
+                console.error('Erro ao trocar tokens:', error);
+                throw error;
             }
         }
 
-        async function estimarGas() {
-            const quantidadeFlashLoan = document.getElementById('quantidadeFlashLoan').value;
-            const lucroMinimo = document.getElementById('lucroMinimo').value;
-            const slippageMaximo = document.getElementById('slippageMaximo').value;
-
+        // Funções de exemplo para interagir com o HTML
+        async function realizarArbitragem() {
             try {
-                gasEstimado = await contratoArbitragem.methods.executarArbitragem(
-                    web3.utils.toWei(quantidadeFlashLoan, 'mwei'),
-                    web3.utils.toWei(lucroMinimo, 'ether'),
-                    web3.utils.toWei(slippageMaximo, 'ether')
-                ).estimateGas({ from: enderecoCarteira });
+                const quantia = '1000000000';
+                const dexList = [0, 1];
+                const pairs = ['0x...', '0x...'];
+                const profit = '100000';
+                const timestamp = Date.now();
+                const nonce = 1;
+                const assinatura = '0x...';
 
-                gasPrice = await web3.eth.getGasPrice();
-
-                return true;
+                const receipt = await executarArbitragem(quantia, dexList, pairs, profit, timestamp, nonce, assinatura);
+                console.log('Arbitragem realizada:', receipt);
             } catch (error) {
-                console.error("Erro ao estimar gás:", error);
-                adicionarLog("Erro ao estimar gás: " + error.message);
-                return false;
+                console.error('Erro ao realizar arbitragem:', error);
             }
         }
 
-        async function executarArbitragem() {
-            if (!web3 || !enderecoCarteira) {
-                adicionarLog("Por favor, conecte sua carteira primeiro.");
-                return;
-            }
-
-            const precoMaximoGas = document.getElementById('precoMaximoGas').value;
-
+        async function realizarTroca() {
             try {
-                const saldosVerificados = await verificarSaldos();
-                if (!saldosVerificados) return;
+                const tokenEntrada = USDC_ADDRESS;
+                const tokenSaida = DAI_ADDRESS;
+                const quantia = '1000000000';
 
-                const gasEstimadoValido = await estimarGas();
-                if (!gasEstimadoValido) return;
-
-                const saldoCarteira = await web3.eth.getBalance(enderecoCarteira);
-                const custoGasEstimado = BigInt(gasEstimado) * BigInt(gasPrice);
-
-                if (BigInt(saldoCarteira) < custoGasEstimado) {
-                    adicionarLog("Saldo insuficiente para cobrir o custo de gás estimado.");
-                    return;
-                }
-
-                if (parseFloat(web3.utils.fromWei(gasPrice, 'gwei')) > parseFloat(precoMaximoGas)) {
-                    adicionarLog("Custo de gás estimado excede o máximo permitido pelo usuário.");
-                    document.getElementById('gasEstimadoModal').innerText = `${web3.utils.fromWei(custoGasEstimado.toString(), 'ether')} MATIC`;
-                    document.getElementById('modal').style.display = 'block';
-                    return;
-                }
-
-                const result = await contratoArbitragem.methods.executarArbitragem(
-                    web3.utils.toWei(quantidadeFlashLoan, 'mwei'), // Supondo que USDC tenha 6 decimais
-                    web3.utils.toWei(lucroMinimo, 'ether'),
-                    web3.utils.toWei(slippageMaximo, 'ether')
-                ).send({ from: enderecoCarteira, gas: gasEstimado, gasPrice: gasPrice });
-
-                adicionarLog("Arbitragem executada com sucesso. Transação: " + result.transactionHash);
-
-                // Atualizar os saldos após a execução da arbitragem
-                await verificarSaldos();
-
+                const receipt = await trocarTokens(tokenEntrada, tokenSaida, quantia);
+                console.log('Troca realizada:', receipt);
             } catch (error) {
-                console.error("Erro ao executar arbitragem:", error);
-                adicionarLog("Erro ao executar arbitragem: " + error.message);
+                console.error('Erro ao realizar troca:', error);
             }
-        }
-
-        function adicionarLog(mensagem) {
-            const logList = document.getElementById('logList');
-            const listItem = document.createElement('li');
-            listItem.textContent = `${new Date().toLocaleString()}: ${mensagem}`;
-            logList.appendChild(listItem);
-        }
-
-        function iniciarArbitragem() {
-            adicionarLog("Arbitragem automática iniciada.");
-            intervalId = setInterval(executarArbitragem, 5000); // Executa a cada 5 segundos
-        }
-
-        function pararArbitragem() {
-            clearInterval(intervalId);
-            adicionarLog("Arbitragem automática parada.");
-        }
-
-        function confirmarTransacao() {
-            document.getElementById('modal').style.display = 'none';
-            executarArbitragem();
-        }
-
-        function cancelarTransacao() {
-            document.getElementById('modal').style.display = 'none';
-            adicionarLog("Transação cancelada pelo usuário devido ao custo de gás elevado.");
         }
     </script>
+</head>
+<body>
+    <h1>Arbitragem DeFi</h1>
+    <button onclick="realizarArbitragem()">Realizar Arbitragem</button>
+    <button onclick="realizarTroca()">Trocar Tokens</button>
 </body>
 </html>
