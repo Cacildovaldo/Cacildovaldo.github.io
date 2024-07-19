@@ -41,7 +41,7 @@
             margin: 5px 0;
             box-sizing: border-box;
         }
-        #status {
+        #status, #saldoCarteira, #saldoContrato {
             font-weight: bold;
             margin-bottom: 10px;
         }
@@ -58,7 +58,10 @@
     <div class="container">
         <h1>Sistema de Arbitragem DeFi Automatizado com Flash Loans</h1>
         <div id="status">Status da Carteira: Desconectado</div>
+        <div id="saldoCarteira">Saldo da Carteira: --</div>
+        <div id="saldoContrato">Saldo do Contrato: --</div>
         <button onclick="conectarCarteira()">Conectar Carteira</button>
+        <button onclick="verificarSaldos()">Verificar Saldos</button>
         <button onclick="iniciarArbitragem()">Iniciar Arbitragem Automática</button>
         <button onclick="pararArbitragem()">Parar Arbitragem Automática</button>
 
@@ -73,7 +76,7 @@
         <input type="number" id="slippageMaximo" min="0" step="0.1" value="1">
 
         <label for="quantidadeFlashLoan">Quantidade do Flash Loan (USDC):</label>
-        <input type="number" id="quantidadeFlashLoan" min="0" step="100" value="1000">
+        <input type="number" id="quantidadeFlashLoan" min="0" step="100" value="10000">
 
         <div id="operacoesLog">
             <h3>Log de Operações Automáticas</h3>
@@ -101,6 +104,7 @@
                     document.getElementById('status').innerText = `Status da Carteira: Conectado (${enderecoCarteira})`;
                     contratoArbitragem = new web3.eth.Contract(ABI_CONTRATO, ENDERECO_CONTRATO);
                     adicionarLog("Carteira conectada com sucesso.");
+                    await verificarSaldos();
                 } catch (error) {
                     console.error("Erro ao conectar carteira:", error);
                     adicionarLog("Erro ao conectar carteira: " + error.message);
@@ -108,6 +112,28 @@
             } else {
                 alert("Por favor, instale a MetaMask!");
                 adicionarLog("MetaMask não detectada. Por favor, instale-a.");
+            }
+        }
+
+        async function verificarSaldos() {
+            if (!web3 || !enderecoCarteira) {
+                adicionarLog("Por favor, conecte sua carteira primeiro.");
+                return;
+            }
+
+            try {
+                const saldoCarteira = await web3.eth.getBalance(enderecoCarteira);
+                const saldoCarteiraEth = web3.utils.fromWei(saldoCarteira, 'ether');
+                document.getElementById('saldoCarteira').innerText = `Saldo da Carteira: ${saldoCarteiraEth} ETH`;
+
+                const saldoContrato = await web3.eth.getBalance(ENDERECO_CONTRATO);
+                const saldoContratoEth = web3.utils.fromWei(saldoContrato, 'ether');
+                document.getElementById('saldoContrato').innerText = `Saldo do Contrato: ${saldoContratoEth} ETH`;
+
+                adicionarLog("Saldos atualizados com sucesso.");
+            } catch (error) {
+                console.error("Erro ao verificar saldos:", error);
+                adicionarLog("Erro ao verificar saldos: " + error.message);
             }
         }
 
@@ -125,15 +151,20 @@
             try {
                 adicionarLog("Iniciando execução de arbitragem...");
                 
-                const estimativaGas = await contratoArbitragem.methods.executarArbitragem(
+                // Verificar saldo da carteira antes de executar
+                const saldoCarteira = await web3.eth.getBalance(enderecoCarteira);
+                const gasEstimado = await contratoArbitragem.methods.executarArbitragem(
                     web3.utils.toWei(quantidadeFlashLoan, 'ether'),
                     web3.utils.toWei(lucroMinimo, 'ether'),
                     web3.utils.toWei(slippageMaximo, 'ether')
                 ).estimateGas({ from: enderecoCarteira });
 
-                adicionarLog(`Estimativa de gás: ${estimativaGas}`);
+                const custoGasEstimado = gasEstimado * web3.utils.toWei(precoMaximoGas, 'gwei');
 
-                const precoGasWeb3 = web3.utils.toWei(precoMaximoGas, 'gwei');
+                if (BigInt(saldoCarteira) < BigInt(custoGasEstimado)) {
+                    adicionarLog("Saldo insuficiente para cobrir o custo de gás estimado.");
+                    return;
+                }
 
                 const result = await contratoArbitragem.methods.executarArbitragem(
                     web3.utils.toWei(quantidadeFlashLoan, 'ether'),
@@ -141,10 +172,11 @@
                     web3.utils.toWei(slippageMaximo, 'ether')
                 ).send({
                     from: enderecoCarteira,
-                    gas: Math.floor(estimativaGas * 1.2), // Aumentando o limite de gás em 20%
-                    gasPrice: precoGasWeb3
+                    gas: Math.floor(gasEstimado * 1.2), // Aumentando o limite de gás em 20%
+                    gasPrice: web3.utils.toWei(precoMaximoGas, 'gwei')
                 });
                 adicionarLog("Arbitragem executada com sucesso. Hash da transação: " + result.transactionHash);
+                await verificarSaldos(); // Atualizar saldos após a execução
             } catch (error) {
                 console.error("Erro ao executar arbitragem:", error);
                 if (error.message.includes("execution reverted")) {
@@ -163,8 +195,8 @@
             if (intervalId) {
                 clearInterval(intervalId);
             }
-            intervalId = setInterval(executarArbitragem, 30000); // Aumentando o intervalo para 30 segundos
-            adicionarLog("Arbitragem automática iniciada. Intervalo: 30 segundos.");
+            intervalId = setInterval(executarArbitragem, 60000); // Aumentando o intervalo para 1 minuto
+            adicionarLog("Arbitragem automática iniciada. Intervalo: 1 minuto.");
         }
 
         function pararArbitragem() {
