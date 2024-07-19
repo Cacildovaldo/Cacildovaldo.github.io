@@ -128,13 +128,19 @@
             if (typeof window.ethereum !== 'undefined') {
                 try {
                     await window.ethereum.request({ method: 'eth_requestAccounts' });
-                    await window.ethereum.request({
-                        method: 'wallet_switchEthereumChain',
-                        params: [{ chainId: '0x89' }], // chainId para Polygon Mainnet
-                    });
                     web3 = new Web3(window.ethereum);
                     const contas = await web3.eth.getAccounts();
                     enderecoCarteira = contas[0];
+                    
+                    // Verificar se está na rede Polygon
+                    const networkId = await web3.eth.net.getId();
+                    if (networkId !== 137) { // 137 é o ID da rede Polygon Mainnet
+                        await window.ethereum.request({
+                            method: 'wallet_switchEthereumChain',
+                            params: [{ chainId: '0x89' }], // chainId para Polygon Mainnet
+                        });
+                    }
+                    
                     document.getElementById('status').innerText = `Status da Carteira: Conectado (${enderecoCarteira})`;
                     contratoArbitragem = new web3.eth.Contract(ABI_CONTRATO, ENDERECO_CONTRATO);
                     adicionarLog("Carteira conectada com sucesso à rede Polygon.");
@@ -185,7 +191,6 @@
             try {
                 adicionarLog("Iniciando execução de arbitragem...");
                 
-                // Verificar saldo da carteira antes de executar
                 const saldoCarteira = await web3.eth.getBalance(enderecoCarteira);
                 const gasEstimado = await contratoArbitragem.methods.executarArbitragem(
                     web3.utils.toWei(quantidadeFlashLoan, 'ether'),
@@ -193,17 +198,16 @@
                     web3.utils.toWei(slippageMaximo, 'ether')
                 ).estimateGas({ from: enderecoCarteira });
 
-                const custoGasEstimado = gasEstimado * web3.utils.toWei(precoMaximoGas, 'gwei');
+                const gasPrice = await web3.eth.getGasPrice();
+                const custoGasEstimado = BigInt(gasEstimado) * BigInt(gasPrice);
 
-                if (BigInt(saldoCarteira) < BigInt(custoGasEstimado)) {
+                if (BigInt(saldoCarteira) < custoGasEstimado) {
                     adicionarLog("Saldo insuficiente para cobrir o custo de gás estimado.");
                     return;
                 }
 
-                // Verificar se a taxa de gás é elevada
-                const gasPrice = await web3.eth.getGasPrice();
                 if (BigInt(gasPrice) > BigInt(web3.utils.toWei(precoMaximoGas, 'gwei'))) {
-                    const custoEstimadoMatic = web3.utils.fromWei(BigInt(gasEstimado) * BigInt(gasPrice), 'ether');
+                    const custoEstimadoMatic = web3.utils.fromWei(custoGasEstimado.toString(), 'ether');
                     document.getElementById('gasEstimadoModal').innerText = `Custo estimado: ${custoEstimadoMatic} MATIC`;
                     document.getElementById('modal').style.display = 'block';
                     return;
@@ -228,20 +232,19 @@
                     web3.utils.toWei(slippageMaximo, 'ether')
                 ).send({
                     from: enderecoCarteira,
-                    gas: Math.floor(gasEstimado * 1.2), // Aumentando o limite de gás em 20%
+                    gas: Math.floor(gasEstimado * 1.2),
                     gasPrice: web3.utils.toWei(precoMaximoGas, 'gwei')
                 });
                 adicionarLog("Arbitragem executada com sucesso. Hash da transação: " + result.transactionHash);
-                await verificarSaldos(); // Atualizar saldos após a execução
+                await verificarSaldos();
             } catch (error) {
                 throw error;
             }
         }
 
         async function tentarReajustarTransacao(quantidadeFlashLoan, lucroMinimo, slippageMaximo) {
-            // Ajustar parâmetros e tentar novamente
-            const novoLucroMinimo = (parseFloat(lucroMinimo) * 0.9).toString(); // Reduz o lucro mínimo em 10%
-            const novoSlippage = (parseFloat(slippageMaximo) * 1.1).toString(); // Aumenta o slippage em 10%
+            const novoLucroMinimo = (parseFloat(lucroMinimo) * 0.9).toString();
+            const novoSlippage = (parseFloat(slippageMaximo) * 1.1).toString();
 
             try {
                 await enviarTransacao(
@@ -264,8 +267,8 @@
             if (intervalId) {
                 clearInterval(intervalId);
             }
-            intervalId = setInterval(executarArbitragem, 10000); // Intervalo de 10 segundos
-            adicionarLog("Arbitragem automática iniciada. Intervalo: 10 segundos.");
+            intervalId = setInterval(executarArbitragem, 60000);
+            adicionarLog("Arbitragem automática iniciada. Intervalo: 1 minuto.");
         }
 
         function pararArbitragem() {
@@ -278,4 +281,22 @@
 
         function adicionarLog(mensagem) {
             const logList = document.getElementById('logList');
-            const logItem = document.
+            const logItem = document.createElement('li');
+            logItem.textContent = `${new Date().toLocaleTimeString()}: ${mensagem}`;
+            logList.appendChild(logItem);
+            logList.scrollTop = logList.scrollHeight;
+        }
+
+        function confirmarTransacao() {
+            document.getElementById('modal').style.display = 'none';
+            executarArbitragem();
+        }
+
+        function cancelarTransacao() {
+document.getElementById('modal').style.display = 'none';
+adicionarLog("Transação cancelada pelo usuário devido ao custo de gás elevado.");
+}
+</script>
+
+</body>
+</html>
