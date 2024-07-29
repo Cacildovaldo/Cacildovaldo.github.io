@@ -37,141 +37,141 @@
     <script>
         const contractAddress = '0x8F65C155cBFc34C09583a74fEBc581DCd5Cae34E';
         const contractABI = [
-	{
-		"inputs": [
-			{
-				"internalType": "address[]",
-				"name": "_assets",
-				"type": "address[]"
-			},
-			{
-				"internalType": "uint256[]",
-				"name": "_amounts",
-				"type": "uint256[]"
-			},
-			{
-				"internalType": "uint256[]",
-				"name": "_modes",
-				"type": "uint256[]"
-			},
-			{
-				"internalType": "bytes",
-				"name": "_params",
-				"type": "bytes"
-			}
-		],
-		"name": "executeArbitrage",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address[]",
-				"name": "assets",
-				"type": "address[]"
-			},
-			{
-				"internalType": "uint256[]",
-				"name": "amounts",
-				"type": "uint256[]"
-			},
-			{
-				"internalType": "uint256[]",
-				"name": "premiums",
-				"type": "uint256[]"
-			},
-			{
-				"internalType": "bytes",
-				"name": "params",
-				"type": "bytes"
-			}
-		],
-		"name": "executeOperation",
-		"outputs": [
-			{
-				"internalType": "bool",
-				"name": "",
-				"type": "bool"
-			}
-		],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "_addressesProvider",
-				"type": "address"
-			}
-		],
-		"stateMutability": "nonpayable",
-		"type": "constructor"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "_token",
-				"type": "address"
-			},
-			{
-				"internalType": "uint256",
-				"name": "_amount",
-				"type": "uint256"
-			}
-		],
-		"name": "withdrawFunds",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"stateMutability": "payable",
-		"type": "receive"
-	},
-	{
-		"inputs": [],
-		"name": "addressesProvider",
-		"outputs": [
-			{
-				"internalType": "contract IPoolAddressesProvider",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "owner",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "pool",
-		"outputs": [
-			{
-				"internalType": "contract IPool",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	}
-];
+            {
+                "inputs": [
+                    {
+                        "internalType": "address[]",
+                        "name": "_assets",
+                        "type": "address[]"
+                    },
+                    {
+                        "internalType": "uint256[]",
+                        "name": "_amounts",
+                        "type": "uint256[]"
+                    },
+                    {
+                        "internalType": "uint256[]",
+                        "name": "_modes",
+                        "type": "uint256[]"
+                    },
+                    {
+                        "internalType": "bytes",
+                        "name": "_params",
+                        "type": "bytes"
+                    }
+                ],
+                "name": "executeArbitrage",
+                "outputs": [],
+                "stateMutability": "nonpayable",
+                "type": "function"
+            },
+            {
+                "inputs": [
+                    {
+                        "internalType": "address[]",
+                        "name": "assets",
+                        "type": "address[]"
+                    },
+                    {
+                        "internalType": "uint256[]",
+                        "name": "amounts",
+                        "type": "uint256[]"
+                    },
+                    {
+                        "internalType": "uint256[]",
+                        "name": "premiums",
+                        "type": "uint256[]"
+                    },
+                    {
+                        "internalType": "bytes",
+                        "name": "params",
+                        "type": "bytes"
+                    }
+                ],
+                "name": "executeOperation",
+                "outputs": [
+                    {
+                        "internalType": "bool",
+                        "name": "",
+                        "type": "bool"
+                    }
+                ],
+                "stateMutability": "nonpayable",
+                "type": "function"
+            },
+            {
+                "inputs": [
+                    {
+                        "internalType": "address",
+                        "name": "_addressesProvider",
+                        "type": "address"
+                    }
+                ],
+                "stateMutability": "nonpayable",
+                "type": "constructor"
+            },
+            {
+                "inputs": [
+                    {
+                        "internalType": "address",
+                        "name": "_token",
+                        "type": "address"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "_amount",
+                        "type": "uint256"
+                    }
+                ],
+                "name": "withdrawFunds",
+                "outputs": [],
+                "stateMutability": "nonpayable",
+                "type": "function"
+            },
+            {
+                "stateMutability": "payable",
+                "type": "receive"
+            },
+            {
+                "inputs": [],
+                "name": "addressesProvider",
+                "outputs": [
+                    {
+                        "internalType": "contract IPoolAddressesProvider",
+                        "name": "",
+                        "type": "address"
+                    }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [],
+                "name": "owner",
+                "outputs": [
+                    {
+                        "internalType": "address",
+                        "name": "",
+                        "type": "address"
+                    }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [],
+                "name": "pool",
+                "outputs": [
+                    {
+                        "internalType": "contract IPool",
+                        "name": "",
+                        "type": "address"
+                    }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            }
+        ];
 
         const USDC_ADDRESS = '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359';
         const WETH_ADDRESS = '0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619';
@@ -263,7 +263,7 @@
                 const url = 'https://api.thegraph.com/subgraphs/name/uniswap/uniswap-v2';
                 const query = `
                     {
-                        pair(id: "${tokenIn.toLowerCase()}-${tokenOut.toLowerCase()}") {
+                        pair(id: "${tokenIn}_${tokenOut}") {
                             token0 {
                                 id
                                 symbol
@@ -288,29 +288,9 @@
         }
 
         async function getPriceFromUniswapV3(tokenIn, tokenOut, amount) {
-            try {
-                const url = 'https://api.thegraph.com/subgraphs/name/uniswap/uniswap-v3';
-                const query = `
-                    {
-                        pool(id: "${tokenIn.toLowerCase()}-${tokenOut.toLowerCase()}") {
-                            token0 {
-                                id
-                            }
-                            token1 {
-                                id
-                            }
-                            sqrtPriceX96
-                        }
-                    }
-                `;
-                const response = await axios.post(url, { query });
-                const { sqrtPriceX96 } = response.data.data.pool;
-                const price = Math.pow(parseFloat(sqrtPriceX96) / Math.pow(2, 96), 2);
-                return price * amount;
-            } catch (error) {
-                console.error('Error fetching price from Uniswap V3:', error);
-                throw new Error('Network Error while fetching prices');
-            }
+            // Implementar lógica para obter preço da Uniswap V3
+            // Este é um exemplo simplificado, você precisará ajustar de acordo com a API real da Uniswap V3
+            return getPriceFromUniswapV2(tokenIn, tokenOut, amount) * 1.001; // Simulando uma pequena diferença
         }
 
         async function estimateGasCost() {
@@ -322,7 +302,7 @@
                     [0],
                     '0x'
                 );
-                return ethers.utils.formatEther(gasPrice.mul(gasLimit));
+                return gasPrice.mul(gasLimit);
             } catch (error) {
                 console.error('Error estimating gas cost:', error);
                 throw new Error('Network Error while estimating gas cost');
@@ -331,59 +311,76 @@
 
         async function executeArbitrage() {
             const loanAmount = parseFloat(document.getElementById('loanAmount').value) || 0;
-            const slippage = parseFloat(document.getElementById('slippage').value) / 100;
+            const assets = [USDC_ADDRESS];
+            const amounts = [ethers.utils.parseUnits(loanAmount.toString(), 6)];
+            const modes = [0]; // 0 for no debt, 1 for stable, 2 for variable
+
+            // Encode the arbitrage parameters
+            const arbitrageParams = ethers.utils.defaultAbiCoder.encode(
+                ['address', 'address', 'uint256'],
+                [USDC_ADDRESS, WETH_ADDRESS, ethers.utils.parseUnits(loanAmount.toString(), 6)]
+            );
 
             try {
-                const tx = await contract.ArbitrageOverdome(
-                    USDC_ADDRESS,
-                    ethers.utils.parseUnits(loanAmount.toFixed(6), 6),
-                    [0],
-                    [USDC_ADDRESS],
-                    ethers.utils.parseUnits(loanAmount.toFixed(6), 6) * (1 + slippage),
-                    Math.floor(Date.now() / 1000) + 600,
-                    Math.floor(Math.random() * 1000000),
-                    '0x'
-                );
+                // Estimate gas for the transaction
+                const gasEstimate = await contract.estimateGas.executeArbitrage(assets, amounts, modes, arbitrageParams);
+                
+                // Add a buffer to the gas estimate
+                const gasLimit = gasEstimate.mul(120).div(100); // 20% buffer
 
-                setStatus('Transaction sent! Awaiting confirmation...', 'info');
-                log(`Transaction hash: ${tx.hash}`);
-                await tx.wait();
-                setStatus('Arbitrage executed successfully!', 'success');
-                log(`Transaction confirmed in block: ${tx.blockNumber}`);
+                const tx = await contract.executeArbitrage(assets, amounts, modes, arbitrageParams, {
+                    gasLimit: gasLimit
+                });
+
+                setStatus('Executing arbitrage...', 'info');
+                const receipt = await tx.wait();
+                
+                if (receipt.status === 1) {
+                    setStatus('Arbitrage executed successfully!', 'success');
+                    log(`Arbitrage executed: TxHash - ${tx.hash}`);
+                } else {
+                    setStatus('Arbitrage failed', 'error');
+                    log(`Arbitrage failed: TxHash - ${tx.hash}`);
+                }
             } catch (error) {
                 console.error('Error executing arbitrage:', error);
                 setStatus('Error executing arbitrage: ' + error.message, 'error');
+                log(`Error executing arbitrage: ${error.message}`);
             }
         }
 
         function setStatus(message, type) {
-            const statusElem = document.getElementById('status');
-            statusElem.textContent = message;
-            statusElem.className = type;
+            const statusElement = document.getElementById('status');
+            statusElement.textContent = message;
+            statusElement.className = type;
         }
 
         function log(message) {
-            const logsElem = document.getElementById('logs');
-            logsElem.textContent += message + '\n';
+            const logsElement = document.getElementById('logs');
+            const logMessage = document.createElement('div');
+            logMessage.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logMessage.className = 'log';
+            logsElement.appendChild(logMessage);
         }
 
         document.getElementById('connectWallet').addEventListener('click', connectWallet);
         document.getElementById('executeArbitrage').addEventListener('click', executeArbitrage);
+        document.getElementById('loanAmount').addEventListener('input', checkArbitrageOpportunity);
 
-        // Função para atualizar valores dos tokens
-        async function updateTokenValues() {
+        // Fetch and display token values
+        async function fetchTokenValues() {
             try {
                 const usdcValue = await getPriceFromUniswapV2(USDC_ADDRESS, WETH_ADDRESS, 1);
-                const wethValue = await getPriceFromUniswapV3(USDC_ADDRESS, WETH_ADDRESS, 1);
-
-                document.getElementById('usdcValue').textContent = usdcValue.toFixed(4);
-                document.getElementById('wethValue').textContent = wethValue.toFixed(4);
+                const wethValue = await getPriceFromUniswapV2(WETH_ADDRESS, USDC_ADDRESS, 1);
+                document.getElementById('usdcValue').textContent = usdcValue.toFixed(6);
+                document.getElementById('wethValue').textContent = wethValue.toFixed(6);
             } catch (error) {
-                console.error('Error updating token values:', error);
+                console.error('Error fetching token values:', error);
             }
         }
 
-        updateTokenValues();
+        fetchTokenValues();
+        setInterval(fetchTokenValues, 60000); // Update token values every minute
     </script>
 </body>
 </html>
