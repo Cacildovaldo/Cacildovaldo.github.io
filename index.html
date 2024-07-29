@@ -94,6 +94,12 @@
                 console.log('Price Exchange 1:', priceExchange1);
                 console.log('Price Exchange 2:', priceExchange2);
 
+                if (priceExchange1 <= 0 || priceExchange2 <= 0) {
+                    setStatus('Invalid price data from Uniswap', 'error');
+                    isChecking = false;
+                    return;
+                }
+
                 const flashLoanFee = loanAmount * 0.0009;
                 const estimatedGasCost = await estimateGasCost();
                 const slippage = parseFloat(document.getElementById('slippage').value) / 100;
@@ -113,47 +119,59 @@
                     document.getElementById('profitAmount').textContent = potentialProfit.toFixed(4);
                     document.getElementById('executeArbitrage').disabled = false;
                 } else {
-                    setStatus('No profitable arbitrage opportunity at the moment', 'error');
-                    document.getElementById('profit').textContent = '0';
-                    document.getElementById('profitAmount').textContent = '0';
+                    setStatus('No arbitrage opportunity found', 'error');
                     document.getElementById('executeArbitrage').disabled = true;
                 }
             } catch (error) {
                 console.error('Error checking arbitrage opportunity:', error);
-                setStatus('Error checking arbitrage opportunity', 'error');
+                setStatus('Error checking arbitrage opportunity: ' + error.message, 'error');
+            } finally {
+                isChecking = false;
             }
-
-            isChecking = false;
-            setTimeout(checkArbitrageOpportunity, 10000);
         }
 
         async function getPriceFromUniswapV3(tokenIn, tokenOut, amount) {
-            const chainId = 137; // Polygon MainNet
-            const [tokenInDecimals, tokenOutDecimals] = await Promise.all([
-                getTokenDecimals(tokenIn),
-                getTokenDecimals(tokenOut)
-            ]);
+            try {
+                const chainId = 137; // Polygon MainNet
+                const [tokenInDecimals, tokenOutDecimals] = await Promise.all([
+                    getTokenDecimals(tokenIn),
+                    getTokenDecimals(tokenOut)
+                ]);
 
-            const amountIn = ethers.utils.parseUnits(amount.toString(), tokenInDecimals);
-            const poolAddress = UniswapV3.getPoolAddress(tokenIn, tokenOut, 3000, UNISWAP_V3_FACTORY_ADDRESS, UNISWAP_V3_POOL_INIT_CODE_HASH);
+                const amountIn = ethers.utils.parseUnits(amount.toString(), tokenInDecimals);
+                const poolAddress = UniswapV3.getPoolAddress(tokenIn, tokenOut, 3000, UNISWAP_V3_FACTORY_ADDRESS, UNISWAP_V3_POOL_INIT_CODE_HASH);
 
-            const pool = new ethers.Contract(poolAddress, UniswapV3.POOL_ABI, provider);
-            const slot0 = await pool.slot0();
-            const sqrtPriceX96 = slot0.sqrtPriceX96;
-            const price = UniswapV3.getPriceFromSqrtPriceX96(sqrtPriceX96, tokenInDecimals, tokenOutDecimals);
+                const pool = new ethers.Contract(poolAddress, UniswapV3.POOL_ABI, provider);
+                const slot0 = await pool.slot0();
+                const sqrtPriceX96 = slot0.sqrtPriceX96;
+                const price = UniswapV3.getPriceFromSqrtPriceX96(sqrtPriceX96, tokenInDecimals, tokenOutDecimals);
 
-            return amountIn.mul(price).div(ethers.utils.parseUnits('1', tokenOutDecimals)).toNumber();
+                return amountIn.mul(price).div(ethers.utils.parseUnits('1', tokenOutDecimals)).toNumber();
+            } catch (error) {
+                console.error('Error getting price from Uniswap V3:', error);
+                throw error;
+            }
         }
 
         async function getTokenDecimals(tokenAddress) {
-            const token = new ethers.Contract(tokenAddress, ["function decimals() view returns (uint8)"], provider);
-            return await token.decimals();
+            try {
+                const token = new ethers.Contract(tokenAddress, ["function decimals() view returns (uint8)"], provider);
+                return await token.decimals();
+            } catch (error) {
+                console.error('Error getting token decimals:', error);
+                throw error;
+            }
         }
 
         async function estimateGasCost() {
-            const gasPrice = await provider.getGasPrice();
-            const estimatedGasLimit = ethers.BigNumber.from('21000'); // Estimativa simplificada
-            return gasPrice.mul(estimatedGasLimit);
+            try {
+                const gasPrice = await provider.getGasPrice();
+                const estimatedGasLimit = ethers.BigNumber.from('21000'); // Estimativa simplificada
+                return gasPrice.mul(estimatedGasLimit);
+            } catch (error) {
+                console.error('Error estimating gas cost:', error);
+                throw error;
+            }
         }
 
         async function executeArbitrage() {
@@ -182,7 +200,7 @@
                 setStatus('Arbitrage executed successfully', 'success');
             } catch (error) {
                 console.error('Error executing arbitrage:', error);
-                setStatus('Error executing arbitrage', 'error');
+                setStatus('Error executing arbitrage: ' + error.message, 'error');
             }
         }
 
