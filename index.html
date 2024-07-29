@@ -35,8 +35,22 @@
     <p>WETH: <span id="wethValue">0</span></p>
 
     <script>
-        const contractAddress = '0x8F65C155cBFc34C09583a74fEBc581DCd5Cae34E';
-        const contractABI = [{"inputs":[{"internalType":"address[]","name":"_assets","type":"address[]"},{"internalType":"uint256[]","name":"_amounts","type":"uint256[]"},{"internalType":"uint256[]","name":"_modes","type":"uint256[]"},{"internalType":"bytes","name":"_params","type":"bytes"}],"name":"executeArbitrage","outputs":[],"stateMutability":"nonpayable","type":"function"}];
+        const contractAddress = '0x3D52EeF3dF7CBA02e4608498B3F2dd87402A1b9f'; // Novo endereço do contrato
+        const contractABI = [
+            {
+                "inputs": [
+                    {"internalType": "address[]", "name": "_assets", "type": "address[]"},
+                    {"internalType": "uint256[]", "name": "_amounts", "type": "uint256[]"},
+                    {"internalType": "uint256[]", "name": "_modes", "type": "uint256[]"},
+                    {"internalType": "bytes", "name": "_params", "type": "bytes"}
+                ],
+                "name": "executeArbitrage",
+                "outputs": [],
+                "stateMutability": "nonpayable",
+                "type": "function"
+            },
+            // Adicione o restante da ABI se necessário
+        ];
 
         const USDC_ADDRESS = '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174';
         const WETH_ADDRESS = '0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619';
@@ -159,24 +173,14 @@
             );
 
             try {
-                const tx = await contract.executeArbitrage(assets, amounts, modes, arbitrageParams, {
-                    gasLimit: 500000 // Ajuste conforme necessário
-                });
-
+                const tx = await contract.executeArbitrage(assets, amounts, modes, arbitrageParams);
                 setStatus('Executing arbitrage...', 'info');
-                const receipt = await tx.wait();
-                
-                if (receipt.status === 1) {
-                    setStatus('Arbitrage executed successfully!', 'success');
-                    log(`Arbitrage executed: TxHash - ${tx.hash}`);
-                } else {
-                    setStatus('Arbitrage failed', 'error');
-                    log(`Arbitrage failed: TxHash - ${tx.hash}`);
-                }
+                log(`Arbitrage transaction hash: ${tx.hash}`);
+                await tx.wait();
+                setStatus('Arbitrage executed successfully', 'success');
             } catch (error) {
                 console.error('Error executing arbitrage:', error);
                 setStatus('Error executing arbitrage: ' + error.message, 'error');
-                log(`Error executing arbitrage: ${error.message}`);
             }
         }
 
@@ -188,30 +192,27 @@
 
         function log(message) {
             const logsElement = document.getElementById('logs');
-            const logMessage = document.createElement('div');
-            logMessage.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
-            logMessage.className = 'log';
-            logsElement.appendChild(logMessage);
+            logsElement.textContent += message + '\n';
         }
 
         document.getElementById('connectWallet').addEventListener('click', connectWallet);
         document.getElementById('executeArbitrage').addEventListener('click', executeArbitrage);
-        document.getElementById('loanAmount').addEventListener('input', checkArbitrageOpportunity);
 
-        // Fetch and display token values
-        async function fetchTokenValues() {
+        // Simulação de valores de tokens
+        async function updateTokenValues() {
             try {
-                const usdcValue = await getPriceFromDex(USDC_ADDRESS, WETH_ADDRESS, 1, 'QuickSwap');
-                const wethValue = 1 / usdcValue;
-                document.getElementById('usdcValue').textContent = usdcValue.toFixed(6);
-                document.getElementById('wethValue').textContent = wethValue.toFixed(6);
+                // Aqui você deve implementar a lógica para obter valores reais dos tokens
+                const usdcValue = 1; // USDC = 1 USD
+                const wethValue = 1800; // Valor fictício de WETH em USD
+                document.getElementById('usdcValue').textContent = usdcValue.toFixed(2);
+                document.getElementById('wethValue').textContent = wethValue.toFixed(2);
             } catch (error) {
-                console.error('Error fetching token values:', error);
+                console.error('Error updating token values:', error);
             }
         }
 
-        fetchTokenValues();
-        setInterval(fetchTokenValues, 60000); // Update token values every minute
+        updateTokenValues();
+        setInterval(updateTokenValues, 60000); // Atualiza a cada minuto
     </script>
 </body>
 </html>
