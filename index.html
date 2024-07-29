@@ -4,79 +4,91 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Arbitragem DeFi</title>
-    <!-- Inclusão dos scripts necessários -->
-    <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.0/dist/ethers.min.js"></script>
     <script src="/polyfills.32f0f05a03a79b5e.js"></script>
     <script src="/main.cbf9b1f5d903b603.js"></script>
     <script src="/runtime.4dc27f973ef8498d.js"></script>
 </head>
 <body>
-    <h1>Arbitragem DeFi</h1>
+    <h1>Arbitragem DeFi com Flash Loans</h1>
     <button id="connectButton">Conectar Metamask</button>
-    <button id="executeArbitrage">Executar Arbitragem</button>
-    
+    <button id="startArbitrage">Iniciar Arbitragem</button>
+    <p id="walletBalance">Saldo da carteira: 0</p>
+
     <script>
-        // Configuração do provedor e do contrato
-        const provider = new ethers.providers.Web3Provider(window.ethereum);
-        const contractAddress = "0xf3feaE30F6D823fE03A276DF19c50cBb36A822EE";
-        const abi = [
-            {"inputs":[{"internalType":"address","name":"_addressProvider","type":"address"}],"stateMutability":"nonpayable","type":"constructor"},
-            {"inputs":[],"name":"ADDRESSES_PROVIDER","outputs":[{"internalType":"contract IPoolAddressesProvider","name":"","type":"address"}],"stateMutability":"view","type":"function"},
-            {"inputs":[{"internalType":"address","name":"_token","type":"address"},{"internalType":"uint256","name":"_amount","type":"uint256"},{"internalType":"uint8[]","name":"_dexList","type":"uint8[]"},{"internalType":"address[]","name":"_pairs","type":"address[]"},{"internalType":"uint256","name":"profit","type":"uint256"},{"internalType":"uint256","name":"timestamp","type":"uint256"},{"internalType":"uint256","name":"nonce","type":"uint256"},{"internalType":"bytes","name":"_signature","type":"bytes"}],"name":"ArbitrageOverdome","outputs":[],"stateMutability":"nonpayable","type":"function"},
-            {"inputs":[],"name":"POOL","outputs":[{"internalType":"contract IPool","name":"","type":"address"}],"stateMutability":"view","type":"function"},
-            {"inputs":[{"internalType":"address","name":"asset","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"},{"internalType":"uint256","name":"premium","type":"uint256"},{"internalType":"address","name":"initiator","type":"address"},{"internalType":"bytes","name":"params","type":"bytes"}],"name":"executeOperation","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"},
-            {"inputs":[{"internalType":"bytes32","name":"","type":"bytes32"}],"name":"isValidSign","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},
-            {"inputs":[{"internalType":"address","name":"token","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"withdrawFunds","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"},
-            {"stateMutability":"payable","type":"receive"}
-        ];
-        
-        const contract = new ethers.Contract(contractAddress, abi, provider);
+        // Endereços dos contratos
+        const CONTRACT_ADDRESS = "0xf3feaE30F6D823fE03A276DF19c50cBb36A822EE";
+        const TOKEN_ADDRESS = "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359"; // USDC
+        const WETH_ADDRESS = "0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619"; // WETH
 
-        // Função para conectar com Metamask
-        document.getElementById('connectButton').addEventListener('click', async () => {
-            try {
-                await provider.send("eth_requestAccounts", []);
-                console.log("Carteira conectada com sucesso!");
-            } catch (error) {
-                console.error("Erro ao conectar a carteira:", error);
+        // Função para conectar a Metamask
+        async function connectMetamask() {
+            if (window.ethereum) {
+                try {
+                    await ethereum.request({ method: 'eth_requestAccounts' });
+                    console.log('Metamask conectada');
+                    document.getElementById('connectButton').innerText = 'Conectado';
+                } catch (error) {
+                    console.error('Erro ao conectar Metamask:', error);
+                }
+            } else {
+                console.log('Metamask não detectada');
             }
-        });
-
-        // Função para executar arbitragem
-        document.getElementById('executeArbitrage').addEventListener('click', async () => {
-            const signer = provider.getSigner();
-            const contractWithSigner = contract.connect(signer);
-            
-            try {
-                // Exemplo de chamada de função arbitrária
-                const tx = await contractWithSigner.ArbitrageOverdome(
-                    '0xTokenAddress', // Exemplo de token
-                    ethers.utils.parseUnits('1.0', 18), // Quantidade de tokens
-                    [0], // Lista de DEXes
-                    ['0xPairAddress'], // Lista de pares
-                    ethers.utils.parseUnits('0.1', 18), // Lucro
-                    Math.floor(Date.now() / 1000), // Timestamp
-                    1, // Nonce
-                    '0xSignature' // Assinatura
-                );
-                
-                await tx.wait();
-                console.log("Arbitragem executada com sucesso!");
-            } catch (error) {
-                console.error("Erro ao executar arbitragem:", error);
-            }
-        });
-
-        // Verificar o saldo da carteira
-        async function checkBalance() {
-            const signer = provider.getSigner();
-            const address = await signer.getAddress();
-            const balance = await provider.getBalance(address);
-            console.log("Saldo da carteira:", ethers.utils.formatEther(balance), "ETH");
         }
 
-        // Executar verificação do saldo ao carregar a página
-        window.onload = checkBalance;
+        // Função para verificar o saldo da carteira
+        async function checkWalletBalance() {
+            if (window.ethereum) {
+                const accounts = await ethereum.request({ method: 'eth_requestAccounts' });
+                const account = accounts[0];
+                const balance = await ethereum.request({
+                    method: 'eth_getBalance',
+                    params: [account, 'latest']
+                });
+                document.getElementById('walletBalance').innerText = 'Saldo da carteira: ' + ethers.utils.formatEther(balance) + ' ETH';
+            }
+        }
+
+        // Função para iniciar a arbitragem
+        async function startArbitrage() {
+            if (window.ethereum) {
+                const provider = new ethers.providers.Web3Provider(window.ethereum);
+                const signer = provider.getSigner();
+                const contract = new ethers.Contract(CONTRACT_ADDRESS, [
+                    "function ArbitrageOverdome(address _token, uint256 _amount, uint8[] _dexList, address[] _pairs, uint256 profit, uint256 timestamp, uint256 nonce, bytes _signature) external"
+                ], signer);
+
+                try {
+                    // Exemplo de parâmetros, substitua pelos valores reais
+                    const tokenAddress = TOKEN_ADDRESS;
+                    const amount = ethers.utils.parseUnits("1000", 6); // Exemplo: 1000 USDC
+                    const dexList = [0]; // Lista de DEXes
+                    const pairs = [WETH_ADDRESS, TOKEN_ADDRESS]; // Pares de tokens
+                    const profit = ethers.utils.parseUnits("10", 6); // Exemplo de lucro
+                    const timestamp = Math.floor(Date.now() / 1000); // Timestamp atual
+                    const nonce = Math.floor(Math.random() * 1000000); // Exemplo de nonce
+                    const signature = "0x"; // Assinatura vazia (substitua conforme necessário)
+
+                    // Chamada à função do contrato
+                    const tx = await contract.ArbitrageOverdome(tokenAddress, amount, dexList, pairs, profit, timestamp, nonce, signature);
+                    console.log('Transação iniciada:', tx.hash);
+
+                    // Aguardar a confirmação da transação
+                    await tx.wait();
+                    console.log('Transação confirmada');
+                } catch (error) {
+                    console.error('Erro ao executar arbitragem:', error);
+                }
+            } else {
+                console.log('Metamask não detectada');
+            }
+        }
+
+        // Configuração dos eventos dos botões
+        document.getElementById('connectButton').addEventListener('click', connectMetamask);
+        document.getElementById('startArbitrage').addEventListener('click', startArbitrage);
+
+        // Verificar saldo ao carregar a página
+        window.onload = checkWalletBalance;
     </script>
 </body>
 </html>
