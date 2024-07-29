@@ -105,8 +105,8 @@
                 }
 
                 const [priceQuickSwap, priceSushiSwap] = await Promise.all([
-                    getPriceFromDex(USDC_ADDRESS, WETH_ADDRESS, loanAmount, 'QuickSwap'),
-                    getPriceFromDex(USDC_ADDRESS, WETH_ADDRESS, loanAmount, 'SushiSwap')
+                    getPriceFromDex('QuickSwap'),
+                    getPriceFromDex('SushiSwap')
                 ]);
 
                 const flashLoanFee = loanAmount * 0.0009;
@@ -137,12 +137,33 @@
             }
         }
 
-        async function getPriceFromDex(tokenIn, tokenOut, amount, dexName) {
+        async function getPriceFromDex(dexName) {
             try {
-                // Aqui você deve implementar a lógica para obter o preço real da DEX
-                // Este é apenas um exemplo e não reflete preços reais
-                const basePrice = dexName === 'QuickSwap' ? 1800 : 1795;
-                return basePrice * (1 + Math.random() * 0.01);
+                let url;
+                if (dexName === 'QuickSwap') {
+                    url = 'https://api.thegraph.com/subgraphs/name/quickswap/quickswap-v3';
+                } else if (dexName === 'SushiSwap') {
+                    url = 'https://api.thegraph.com/subgraphs/name/sushi-swap/sushi-swap';
+                } else {
+                    throw new Error('Unsupported DEX');
+                }
+
+                const response = await axios.post(url, {
+                    query: `
+                        {
+                            pair(id: "${USDC_ADDRESS.toLowerCase()}-${WETH_ADDRESS.toLowerCase()}") {
+                                token0Price
+                                token1Price
+                            }
+                        }
+                    `
+                });
+
+                const data = response.data.data.pair;
+                if (!data) throw new Error('No price data found');
+
+                // Assuming token0 is USDC and token1 is WETH for this example
+                return parseFloat(data.token0Price); // Retorne o preço correto baseado na DEX
             } catch (error) {
                 console.error(`Error fetching price from ${dexName}:`, error);
                 throw new Error(`Error fetching price from ${dexName}`);
@@ -161,19 +182,30 @@
         }
 
         async function executeArbitrage() {
-            const loanAmount = parseFloat(document.getElementById('loanAmount').value) || 0;
-            const assets = [USDC_ADDRESS];
-            const amounts = [ethers.utils.parseUnits(loanAmount.toString(), 6)];
-            const modes = [0]; // 0 for no debt, 1 for stable, 2 for variable
-
-            // Encode the arbitrage parameters
-            const arbitrageParams = ethers.utils.defaultAbiCoder.encode(
-                ['address', 'address', 'uint256'],
-                [USDC_ADDRESS, WETH_ADDRESS, ethers.utils.parseUnits(loanAmount.toString(), 6)]
-            );
-
             try {
-                const tx = await contract.executeArbitrage(assets, amounts, modes, arbitrageParams);
+                const loanAmount = parseFloat(document.getElementById('loanAmount').value) || 0;
+                if (loanAmount <= 0) {
+                    setStatus('Please enter a valid loan amount', 'error');
+                    return;
+                }
+
+                const arbitrageParams = ethers.utils.defaultAbiCoder.encode(
+                    ['address[]', 'uint256[]', 'uint256[]', 'bytes'],
+                    [
+                        [USDC_ADDRESS, WETH_ADDRESS],
+                        [ethers.utils.parseUnits(loanAmount.toString(), 6), ethers.utils.parseUnits(loanAmount.toString(), 18)],
+                        [0, 1],
+                        '0x' // Parâmetros específicos de arbitragem (substitua conforme necessário)
+                    ]
+                );
+
+                const tx = await contract.executeArbitrage(
+                    [USDC_ADDRESS, WETH_ADDRESS],
+                    [ethers.utils.parseUnits(loanAmount.toString(), 6), ethers.utils.parseUnits(loanAmount.toString(), 18)],
+                    [0, 1],
+                    arbitrageParams
+                );
+
                 setStatus('Executing arbitrage...', 'info');
                 log(`Arbitrage transaction hash: ${tx.hash}`);
                 await tx.wait();
@@ -198,14 +230,16 @@
         document.getElementById('connectWallet').addEventListener('click', connectWallet);
         document.getElementById('executeArbitrage').addEventListener('click', executeArbitrage);
 
-        // Simulação de valores de tokens
+        // Atualizar os preços dos tokens
         async function updateTokenValues() {
             try {
-                // Aqui você deve implementar a lógica para obter valores reais dos tokens
-                const usdcValue = 1; // USDC = 1 USD
-                const wethValue = 1800; // Valor fictício de WETH em USD
-                document.getElementById('usdcValue').textContent = usdcValue.toFixed(2);
-                document.getElementById('wethValue').textContent = wethValue.toFixed(2);
+                const [usdcPrice, wethPrice] = await Promise.all([
+                    getPriceFromDex('QuickSwap'), // Obter o preço real de USDC
+                    getPriceFromDex('SushiSwap')  // Obter o preço real de WETH
+                ]);
+
+                document.getElementById('usdcValue').textContent = usdcPrice.toFixed(2);
+                document.getElementById('wethValue').textContent = wethPrice.toFixed(2);
             } catch (error) {
                 console.error('Error updating token values:', error);
             }
