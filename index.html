@@ -130,55 +130,45 @@
                 const basePrice = dexName === 'QuickSwap' ? 1800 : 1795;
                 return basePrice * (1 + Math.random() * 0.01);
             } catch (error) {
-                console.error(`Error fetching price from ${dexName}:`, error);
-                throw new Error(`Error fetching price from ${dexName}`);
+                console.error(`Error getting price from ${dexName}:`, error);
+                return 0;
             }
         }
 
         async function estimateGasCost() {
             try {
+                const loanAmount = parseFloat(document.getElementById('loanAmount').value) || 0;
+                if (loanAmount <= 0) return 0;
+
                 const gasPrice = await provider.getGasPrice();
-                const gasLimit = ethers.BigNumber.from(300000); // Estimativa de gas limit
-                return {
-                    gasLimit: gasLimit,
-                    gasPrice: gasPrice
-                };
+                const gasEstimate = await contract.estimateGas.executeArbitrage(
+                    [USDC_ADDRESS, WETH_ADDRESS],
+                    [ethers.utils.parseUnits(loanAmount.toString(), 6), ethers.utils.parseUnits(loanAmount.toString(), 18)],
+                    [0, 0],
+                    []
+                );
+
+                return ethers.utils.formatUnits(gasEstimate.mul(gasPrice), 'ether');
             } catch (error) {
                 console.error('Error estimating gas cost:', error);
-                throw new Error('Error estimating gas cost');
+                return 0;
             }
         }
 
         async function executeArbitrage() {
-            const loanAmount = parseFloat(document.getElementById('loanAmount').value) || 0;
-            if (loanAmount <= 0) {
-                setStatus('Invalid loan amount', 'error');
-                return;
-            }
-
-            const assets = [USDC_ADDRESS];
-            const amounts = [ethers.utils.parseUnits(loanAmount.toString(), 6)]; // USDC has 6 decimals
-            const modes = [0]; // Modos de dívida
-
-            // Codifique os parâmetros de arbitragem
-            const arbitrageParams = ethers.utils.defaultAbiCoder.encode(
-                ['address', 'address', 'uint256'],
-                [USDC_ADDRESS, WETH_ADDRESS, ethers.utils.parseUnits(loanAmount.toString(), 6)]
-            );
-
             try {
-                // Estime o custo de gás
-                const gasEstimate = await estimateGasCost();
+                const loanAmount = parseFloat(document.getElementById('loanAmount').value) || 0;
+                if (loanAmount <= 0) {
+                    setStatus('Please enter a valid loan amount', 'error');
+                    return;
+                }
 
-                // Calcula a taxa proporcional ao valor do empréstimo
-                const flashLoanFee = loanAmount * 0.0009; // 0.09% fee
-                const totalRepayment = loanAmount + flashLoanFee;
-
-                // Executa a arbitragem
-                const tx = await contract.executeArbitrage(assets, amounts, modes, arbitrageParams, {
-                    gasLimit: gasEstimate.gasLimit,
-                    gasPrice: gasEstimate.gasPrice
-                });
+                const tx = await contract.executeArbitrage(
+                    [USDC_ADDRESS, WETH_ADDRESS],
+                    [ethers.utils.parseUnits(loanAmount.toString(), 6), ethers.utils.parseUnits(loanAmount.toString(), 18)],
+                    [0, 0],
+                    []
+                );
 
                 setStatus('Executing arbitrage...', 'info');
                 const receipt = await tx.wait();
