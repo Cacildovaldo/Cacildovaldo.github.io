@@ -139,7 +139,10 @@
             try {
                 const gasPrice = await provider.getGasPrice();
                 const gasLimit = ethers.BigNumber.from(300000); // Estimativa de gas limit
-                return gasPrice.mul(gasLimit);
+                return {
+                    gasLimit: gasLimit,
+                    gasPrice: gasPrice
+                };
             } catch (error) {
                 console.error('Error estimating gas cost:', error);
                 throw new Error('Error estimating gas cost');
@@ -148,24 +151,33 @@
 
         async function executeArbitrage() {
             const loanAmount = parseFloat(document.getElementById('loanAmount').value) || 0;
+            if (loanAmount <= 0) {
+                setStatus('Invalid loan amount', 'error');
+                return;
+            }
+
             const assets = [USDC_ADDRESS];
             const amounts = [ethers.utils.parseUnits(loanAmount.toString(), 6)];
-            const modes = [0]; // 0 for no debt, 1 for stable, 2 for variable
+            const modes = [0]; // Modos de dívida
 
-            // Encode the arbitrage parameters
+            // Codifique os parâmetros arbitragem
             const arbitrageParams = ethers.utils.defaultAbiCoder.encode(
                 ['address', 'address', 'uint256'],
                 [USDC_ADDRESS, WETH_ADDRESS, ethers.utils.parseUnits(loanAmount.toString(), 6)]
             );
 
             try {
+                // Estime o custo de gás
+                const gasEstimate = await estimateGasCost();
+
                 const tx = await contract.executeArbitrage(assets, amounts, modes, arbitrageParams, {
-                    gasLimit: 500000 // Ajuste conforme necessário
+                    gasLimit: gasEstimate.gasLimit,
+                    gasPrice: gasEstimate.gasPrice
                 });
 
                 setStatus('Executing arbitrage...', 'info');
                 const receipt = await tx.wait();
-                
+
                 if (receipt.status === 1) {
                     setStatus('Arbitrage executed successfully!', 'success');
                     log(`Arbitrage executed: TxHash - ${tx.hash}`);
@@ -188,30 +200,11 @@
 
         function log(message) {
             const logsElement = document.getElementById('logs');
-            const logMessage = document.createElement('div');
-            logMessage.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
-            logMessage.className = 'log';
-            logsElement.appendChild(logMessage);
+            logsElement.textContent = `${message}\n${logsElement.textContent}`;
         }
 
         document.getElementById('connectWallet').addEventListener('click', connectWallet);
         document.getElementById('executeArbitrage').addEventListener('click', executeArbitrage);
-        document.getElementById('loanAmount').addEventListener('input', checkArbitrageOpportunity);
-
-        // Fetch and display token values
-        async function fetchTokenValues() {
-            try {
-                const usdcValue = await getPriceFromDex(USDC_ADDRESS, WETH_ADDRESS, 1, 'QuickSwap');
-                const wethValue = 1 / usdcValue;
-                document.getElementById('usdcValue').textContent = usdcValue.toFixed(6);
-                document.getElementById('wethValue').textContent = wethValue.toFixed(6);
-            } catch (error) {
-                console.error('Error fetching token values:', error);
-            }
-        }
-
-        fetchTokenValues();
-        setInterval(fetchTokenValues, 60000); // Update token values every minute
     </script>
 </body>
 </html>
