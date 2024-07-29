@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Arbitragem com Flash Loan Otimizada</title>
+    <title>Arbitragem com Flash Loan na Polygon</title>
     <script src="https://cdn.ethers.io/lib/ethers-5.0.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <style>
@@ -16,7 +16,7 @@
     </style>
 </head>
 <body>
-    <h1>Arbitragem com Flash Loan Otimizada</h1>
+    <h1>Arbitragem com Flash Loan na Polygon</h1>
     <button id="connectWallet">Connect Wallet</button>
     <p>Token Pair: USDC/WETH</p>
     <input type="number" id="loanAmount" placeholder="Enter Amount" min="0" step="0.01">
@@ -36,144 +36,9 @@
 
     <script>
         const contractAddress = '0x8F65C155cBFc34C09583a74fEBc581DCd5Cae34E';
-        const contractABI = [
-            {
-                "inputs": [
-                    {
-                        "internalType": "address[]",
-                        "name": "_assets",
-                        "type": "address[]"
-                    },
-                    {
-                        "internalType": "uint256[]",
-                        "name": "_amounts",
-                        "type": "uint256[]"
-                    },
-                    {
-                        "internalType": "uint256[]",
-                        "name": "_modes",
-                        "type": "uint256[]"
-                    },
-                    {
-                        "internalType": "bytes",
-                        "name": "_params",
-                        "type": "bytes"
-                    }
-                ],
-                "name": "executeArbitrage",
-                "outputs": [],
-                "stateMutability": "nonpayable",
-                "type": "function"
-            },
-            {
-                "inputs": [
-                    {
-                        "internalType": "address[]",
-                        "name": "assets",
-                        "type": "address[]"
-                    },
-                    {
-                        "internalType": "uint256[]",
-                        "name": "amounts",
-                        "type": "uint256[]"
-                    },
-                    {
-                        "internalType": "uint256[]",
-                        "name": "premiums",
-                        "type": "uint256[]"
-                    },
-                    {
-                        "internalType": "bytes",
-                        "name": "params",
-                        "type": "bytes"
-                    }
-                ],
-                "name": "executeOperation",
-                "outputs": [
-                    {
-                        "internalType": "bool",
-                        "name": "",
-                        "type": "bool"
-                    }
-                ],
-                "stateMutability": "nonpayable",
-                "type": "function"
-            },
-            {
-                "inputs": [
-                    {
-                        "internalType": "address",
-                        "name": "_addressesProvider",
-                        "type": "address"
-                    }
-                ],
-                "stateMutability": "nonpayable",
-                "type": "constructor"
-            },
-            {
-                "inputs": [
-                    {
-                        "internalType": "address",
-                        "name": "_token",
-                        "type": "address"
-                    },
-                    {
-                        "internalType": "uint256",
-                        "name": "_amount",
-                        "type": "uint256"
-                    }
-                ],
-                "name": "withdrawFunds",
-                "outputs": [],
-                "stateMutability": "nonpayable",
-                "type": "function"
-            },
-            {
-                "stateMutability": "payable",
-                "type": "receive"
-            },
-            {
-                "inputs": [],
-                "name": "addressesProvider",
-                "outputs": [
-                    {
-                        "internalType": "contract IPoolAddressesProvider",
-                        "name": "",
-                        "type": "address"
-                    }
-                ],
-                "stateMutability": "view",
-                "type": "function"
-            },
-            {
-                "inputs": [],
-                "name": "owner",
-                "outputs": [
-                    {
-                        "internalType": "address",
-                        "name": "",
-                        "type": "address"
-                    }
-                ],
-                "stateMutability": "view",
-                "type": "function"
-            },
-            {
-                "inputs": [],
-                "name": "pool",
-                "outputs": [
-                    {
-                        "internalType": "contract IPool",
-                        "name": "",
-                        "type": "address"
-                    }
-                ],
-                "stateMutability": "view",
-                "type": "function"
-            }
-        ];
+        const contractABI = [{"inputs":[{"internalType":"address[]","name":"_assets","type":"address[]"},{"internalType":"uint256[]","name":"_amounts","type":"uint256[]"},{"internalType":"uint256[]","name":"_modes","type":"uint256[]"},{"internalType":"bytes","name":"_params","type":"bytes"}],"name":"executeArbitrage","outputs":[],"stateMutability":"nonpayable","type":"function"}];
 
-        const USDC_ADDRESS = '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359';
+        const USDC_ADDRESS = '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174';
         const WETH_ADDRESS = '0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619';
 
         let provider, signer, contract;
@@ -225,16 +90,16 @@
                     return;
                 }
 
-                const [priceUniswapV2, priceUniswapV3] = await Promise.all([
-                    getPriceFromUniswapV2(USDC_ADDRESS, WETH_ADDRESS, loanAmount),
-                    getPriceFromUniswapV3(USDC_ADDRESS, WETH_ADDRESS, loanAmount)
+                const [priceQuickSwap, priceSushiSwap] = await Promise.all([
+                    getPriceFromDex(USDC_ADDRESS, WETH_ADDRESS, loanAmount, 'QuickSwap'),
+                    getPriceFromDex(USDC_ADDRESS, WETH_ADDRESS, loanAmount, 'SushiSwap')
                 ]);
 
                 const flashLoanFee = loanAmount * 0.0009;
                 const estimatedGasCost = await estimateGasCost();
                 const slippage = parseFloat(document.getElementById('slippage').value) / 100;
 
-                const potentialProfit = Math.max(priceUniswapV3 - priceUniswapV2, priceUniswapV2 - priceUniswapV3) - flashLoanFee - estimatedGasCost;
+                const potentialProfit = Math.abs(priceQuickSwap - priceSushiSwap) - flashLoanFee - estimatedGasCost;
                 const profitPercentage = (potentialProfit / loanAmount) * 100;
 
                 if (profitPercentage > slippage) {
@@ -258,54 +123,26 @@
             }
         }
 
-        async function getPriceFromUniswapV2(tokenIn, tokenOut, amount) {
+        async function getPriceFromDex(tokenIn, tokenOut, amount, dexName) {
             try {
-                const url = 'https://api.thegraph.com/subgraphs/name/uniswap/uniswap-v2';
-                const query = `
-                    {
-                        pair(id: "${tokenIn}_${tokenOut}") {
-                            token0 {
-                                id
-                                symbol
-                            }
-                            token1 {
-                                id
-                                symbol
-                            }
-                            reserve0
-                            reserve1
-                        }
-                    }
-                `;
-                const response = await axios.post(url, { query });
-                const data = response.data.data.pair;
-                const price = parseFloat(data.reserve1) / parseFloat(data.reserve0);
-                return price * amount;
+                // Aqui você deve implementar a lógica para obter o preço real da DEX
+                // Este é apenas um exemplo e não reflete preços reais
+                const basePrice = dexName === 'QuickSwap' ? 1800 : 1795;
+                return basePrice * (1 + Math.random() * 0.01);
             } catch (error) {
-                console.error('Error fetching price from Uniswap V2:', error);
-                throw new Error('Network Error while fetching prices');
+                console.error(`Error fetching price from ${dexName}:`, error);
+                throw new Error(`Error fetching price from ${dexName}`);
             }
-        }
-
-        async function getPriceFromUniswapV3(tokenIn, tokenOut, amount) {
-            // Implementar lógica para obter preço da Uniswap V3
-            // Este é um exemplo simplificado, você precisará ajustar de acordo com a API real da Uniswap V3
-            return getPriceFromUniswapV2(tokenIn, tokenOut, amount) * 1.001; // Simulando uma pequena diferença
         }
 
         async function estimateGasCost() {
             try {
                 const gasPrice = await provider.getGasPrice();
-                const gasLimit = await contract.estimateGas.executeArbitrage(
-                    [USDC_ADDRESS],
-                    [ethers.utils.parseUnits('1000', 6)], // Exemplo de valor
-                    [0],
-                    '0x'
-                );
+                const gasLimit = ethers.BigNumber.from(300000); // Estimativa de gas limit
                 return gasPrice.mul(gasLimit);
             } catch (error) {
                 console.error('Error estimating gas cost:', error);
-                throw new Error('Network Error while estimating gas cost');
+                throw new Error('Error estimating gas cost');
             }
         }
 
@@ -322,14 +159,8 @@
             );
 
             try {
-                // Estimate gas for the transaction
-                const gasEstimate = await contract.estimateGas.executeArbitrage(assets, amounts, modes, arbitrageParams);
-                
-                // Add a buffer to the gas estimate
-                const gasLimit = gasEstimate.mul(120).div(100); // 20% buffer
-
                 const tx = await contract.executeArbitrage(assets, amounts, modes, arbitrageParams, {
-                    gasLimit: gasLimit
+                    gasLimit: 500000 // Ajuste conforme necessário
                 });
 
                 setStatus('Executing arbitrage...', 'info');
@@ -370,8 +201,8 @@
         // Fetch and display token values
         async function fetchTokenValues() {
             try {
-                const usdcValue = await getPriceFromUniswapV2(USDC_ADDRESS, WETH_ADDRESS, 1);
-                const wethValue = await getPriceFromUniswapV2(WETH_ADDRESS, USDC_ADDRESS, 1);
+                const usdcValue = await getPriceFromDex(USDC_ADDRESS, WETH_ADDRESS, 1, 'QuickSwap');
+                const wethValue = 1 / usdcValue;
                 document.getElementById('usdcValue').textContent = usdcValue.toFixed(6);
                 document.getElementById('wethValue').textContent = wethValue.toFixed(6);
             } catch (error) {
