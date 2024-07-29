@@ -114,88 +114,62 @@
         }
 
         async function getPriceFromExchange1(tokenIn, tokenOut, amount) {
-            // In a real scenario, this would make an API call to a price oracle or DEX API
+            // Em um cenário real, isso faria uma chamada API para um oráculo de preço ou API DEX
             const response = await axios.get(`https://api.exchange1.com/price?tokenIn=${tokenIn}&tokenOut=${tokenOut}&amount=${amount}`);
             return response.data.price;
         }
 
         async function getPriceFromExchange2(tokenIn, tokenOut, amount) {
-            // In a real scenario, this would make an API call to a price oracle or DEX API
+            // Em um cenário real, isso faria uma chamada API para um oráculo de preço ou API DEX
             const response = await axios.get(`https://api.exchange2.com/price?tokenIn=${tokenIn}&tokenOut=${tokenOut}&amount=${amount}`);
             return response.data.price;
         }
 
         async function estimateGasCost() {
             const gasPrice = await provider.getGasPrice();
-            const estimatedGas = await contract.estimateGas.ArbitrageOverdome(
-                USDC_ADDRESS,
-                ethers.utils.parseUnits('1000', 6), // Example amount
-                [1, 2],
-                [WETH_ADDRESS],
-                0,
-                Math.floor(Date.now() / 1000),
-                Math.floor(Math.random() * 1000000),
-                '0x'
-            );
-            return parseFloat(ethers.utils.formatEther(gasPrice.mul(estimatedGas)));
+            const estimatedGasLimit = ethers.BigNumber.from('21000'); // Estimativa simplificada
+            return gasPrice.mul(estimatedGasLimit);
         }
 
         async function executeArbitrage() {
-            if (!contract) return;
-
-            const loanAmount = document.getElementById('loanAmount').value;
-            if (!loanAmount) {
-                setStatus('Please enter a loan amount', 'error');
-                return;
-            }
-
             try {
-                setStatus('Executing arbitrage...', 'success');
-                document.getElementById('executeArbitrage').disabled = true;
+                const loanAmount = ethers.utils.parseUnits(document.getElementById('loanAmount').value, 6); // Assumindo 6 casas decimais para USDC
+                const dexList = [0, 1]; // DEX IDs
+                const pairs = [USDC_ADDRESS, WETH_ADDRESS];
+                const profit = ethers.utils.parseUnits(document.getElementById('profitAmount').textContent, 6);
+                const timestamp = Math.floor(Date.now() / 1000);
+                const nonce = Math.floor(Math.random() * 1e6);
+                const signature = '0x'; // Assinatura vazia para simplificação
 
                 const tx = await contract.ArbitrageOverdome(
                     USDC_ADDRESS,
-                    ethers.utils.parseUnits(loanAmount, 6),
-                    [1, 2],
-                    [WETH_ADDRESS],
-                    0,
-                    Math.floor(Date.now() / 1000),
-                    Math.floor(Math.random() * 1000000),
-                    '0x'
+                    loanAmount,
+                    dexList,
+                    pairs,
+                    profit,
+                    timestamp,
+                    nonce,
+                    signature
                 );
+
+                setStatus(`Transaction sent: ${tx.hash}`, 'success');
                 await tx.wait();
-                setStatus('Arbitrage executed successfully!', 'success');
+                setStatus('Arbitrage executed successfully', 'success');
             } catch (error) {
                 console.error('Error executing arbitrage:', error);
-                setStatus('Failed to execute arbitrage: ' + error.message, 'error');
-            } finally {
-                document.getElementById('executeArbitrage').disabled = false;
+                setStatus('Error executing arbitrage', 'error');
             }
         }
 
         function setStatus(message, type) {
-            const statusElement = document.getElementById('status');
-            statusElement.textContent = message;
-            statusElement.className = type;
-        }
-
-        function updateCalculations() {
-            const loanAmount = parseFloat(document.getElementById('loanAmount').value) || 0;
-            const lenderFee = loanAmount * 0.0009;
-            const paybackAmount = loanAmount + lenderFee;
-            
-            document.getElementById('usdAmount').textContent = loanAmount.toFixed(2);
-            document.getElementById('lenderFee').textContent = lenderFee.toFixed(4);
-            document.getElementById('paybackAmount').textContent = paybackAmount.toFixed(4);
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = message;
+            statusEl.className = type;
         }
 
         document.getElementById('connectWallet').addEventListener('click', connectWallet);
-        document.getElementById('loanAmount').addEventListener('input', updateCalculations);
+        document.getElementById('loanAmount').addEventListener('input', checkArbitrageOpportunity);
         document.getElementById('executeArbitrage').addEventListener('click', executeArbitrage);
-        document.getElementById('slippage').addEventListener('input', checkArbitrageOpportunity);
-
-        // Security measure: Re-check opportunity before execution
-        window.ethereum.on('block', checkArbitrageOpportunity);
     </script>
 </body>
 </html>
