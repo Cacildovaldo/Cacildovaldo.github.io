@@ -35,22 +35,8 @@
     <p>WETH: <span id="wethValue">0</span></p>
 
     <script>
-        const contractAddress = '0x3D52EeF3dF7CBA02e4608498B3F2dd87402A1b9f'; // Novo endereço do contrato
-        const contractABI = [
-            {
-                "inputs": [
-                    {"internalType": "address[]", "name": "_assets", "type": "address[]"},
-                    {"internalType": "uint256[]", "name": "_amounts", "type": "uint256[]"},
-                    {"internalType": "uint256[]", "name": "_modes", "type": "uint256[]"},
-                    {"internalType": "bytes", "name": "_params", "type": "bytes"}
-                ],
-                "name": "executeArbitrage",
-                "outputs": [],
-                "stateMutability": "nonpayable",
-                "type": "function"
-            },
-            // Adicione o restante da ABI se necessário
-        ];
+        const contractAddress = '0x8F65C155cBFc34C09583a74fEBc581DCd5Cae34E';
+        const contractABI = [{"inputs":[{"internalType":"address[]","name":"_assets","type":"address[]"},{"internalType":"uint256[]","name":"_amounts","type":"uint256[]"},{"internalType":"uint256[]","name":"_modes","type":"uint256[]"},{"internalType":"bytes","name":"_params","type":"bytes"}],"name":"executeArbitrage","outputs":[],"stateMutability":"nonpayable","type":"function"}];
 
         const USDC_ADDRESS = '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174';
         const WETH_ADDRESS = '0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619';
@@ -105,8 +91,8 @@
                 }
 
                 const [priceQuickSwap, priceSushiSwap] = await Promise.all([
-                    getPriceFromDex('QuickSwap'),
-                    getPriceFromDex('SushiSwap')
+                    getPriceFromDex(USDC_ADDRESS, WETH_ADDRESS, loanAmount, 'QuickSwap'),
+                    getPriceFromDex(USDC_ADDRESS, WETH_ADDRESS, loanAmount, 'SushiSwap')
                 ]);
 
                 const flashLoanFee = loanAmount * 0.0009;
@@ -137,33 +123,12 @@
             }
         }
 
-        async function getPriceFromDex(dexName) {
+        async function getPriceFromDex(tokenIn, tokenOut, amount, dexName) {
             try {
-                let url;
-                if (dexName === 'QuickSwap') {
-                    url = 'https://api.thegraph.com/subgraphs/name/quickswap/quickswap-v3';
-                } else if (dexName === 'SushiSwap') {
-                    url = 'https://api.thegraph.com/subgraphs/name/sushi-swap/sushi-swap';
-                } else {
-                    throw new Error('Unsupported DEX');
-                }
-
-                const response = await axios.post(url, {
-                    query: `
-                        {
-                            pair(id: "${USDC_ADDRESS.toLowerCase()}-${WETH_ADDRESS.toLowerCase()}") {
-                                token0Price
-                                token1Price
-                            }
-                        }
-                    `
-                });
-
-                const data = response.data.data.pair;
-                if (!data) throw new Error('No price data found');
-
-                // Assuming token0 is USDC and token1 is WETH for this example
-                return parseFloat(data.token0Price); // Retorne o preço correto baseado na DEX
+                // Aqui você deve implementar a lógica para obter o preço real da DEX
+                // Este é apenas um exemplo e não reflete preços reais
+                const basePrice = dexName === 'QuickSwap' ? 1800 : 1795;
+                return basePrice * (1 + Math.random() * 0.01);
             } catch (error) {
                 console.error(`Error fetching price from ${dexName}:`, error);
                 throw new Error(`Error fetching price from ${dexName}`);
@@ -182,37 +147,36 @@
         }
 
         async function executeArbitrage() {
+            const loanAmount = parseFloat(document.getElementById('loanAmount').value) || 0;
+            const assets = [USDC_ADDRESS];
+            const amounts = [ethers.utils.parseUnits(loanAmount.toString(), 6)];
+            const modes = [0]; // 0 for no debt, 1 for stable, 2 for variable
+
+            // Encode the arbitrage parameters
+            const arbitrageParams = ethers.utils.defaultAbiCoder.encode(
+                ['address', 'address', 'uint256'],
+                [USDC_ADDRESS, WETH_ADDRESS, ethers.utils.parseUnits(loanAmount.toString(), 6)]
+            );
+
             try {
-                const loanAmount = parseFloat(document.getElementById('loanAmount').value) || 0;
-                if (loanAmount <= 0) {
-                    setStatus('Please enter a valid loan amount', 'error');
-                    return;
-                }
-
-                const arbitrageParams = ethers.utils.defaultAbiCoder.encode(
-                    ['address[]', 'uint256[]', 'uint256[]', 'bytes'],
-                    [
-                        [USDC_ADDRESS, WETH_ADDRESS],
-                        [ethers.utils.parseUnits(loanAmount.toString(), 6), ethers.utils.parseUnits(loanAmount.toString(), 18)],
-                        [0, 1],
-                        '0x' // Parâmetros específicos de arbitragem (substitua conforme necessário)
-                    ]
-                );
-
-                const tx = await contract.executeArbitrage(
-                    [USDC_ADDRESS, WETH_ADDRESS],
-                    [ethers.utils.parseUnits(loanAmount.toString(), 6), ethers.utils.parseUnits(loanAmount.toString(), 18)],
-                    [0, 1],
-                    arbitrageParams
-                );
+                const tx = await contract.executeArbitrage(assets, amounts, modes, arbitrageParams, {
+                    gasLimit: 500000 // Ajuste conforme necessário
+                });
 
                 setStatus('Executing arbitrage...', 'info');
-                log(`Arbitrage transaction hash: ${tx.hash}`);
-                await tx.wait();
-                setStatus('Arbitrage executed successfully', 'success');
+                const receipt = await tx.wait();
+                
+                if (receipt.status === 1) {
+                    setStatus('Arbitrage executed successfully!', 'success');
+                    log(`Arbitrage executed: TxHash - ${tx.hash}`);
+                } else {
+                    setStatus('Arbitrage failed', 'error');
+                    log(`Arbitrage failed: TxHash - ${tx.hash}`);
+                }
             } catch (error) {
                 console.error('Error executing arbitrage:', error);
                 setStatus('Error executing arbitrage: ' + error.message, 'error');
+                log(`Error executing arbitrage: ${error.message}`);
             }
         }
 
@@ -224,29 +188,30 @@
 
         function log(message) {
             const logsElement = document.getElementById('logs');
-            logsElement.textContent += message + '\n';
+            const logMessage = document.createElement('div');
+            logMessage.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logMessage.className = 'log';
+            logsElement.appendChild(logMessage);
         }
 
         document.getElementById('connectWallet').addEventListener('click', connectWallet);
         document.getElementById('executeArbitrage').addEventListener('click', executeArbitrage);
+        document.getElementById('loanAmount').addEventListener('input', checkArbitrageOpportunity);
 
-        // Atualizar os preços dos tokens
-        async function updateTokenValues() {
+        // Fetch and display token values
+        async function fetchTokenValues() {
             try {
-                const [usdcPrice, wethPrice] = await Promise.all([
-                    getPriceFromDex('QuickSwap'), // Obter o preço real de USDC
-                    getPriceFromDex('SushiSwap')  // Obter o preço real de WETH
-                ]);
-
-                document.getElementById('usdcValue').textContent = usdcPrice.toFixed(2);
-                document.getElementById('wethValue').textContent = wethPrice.toFixed(2);
+                const usdcValue = await getPriceFromDex(USDC_ADDRESS, WETH_ADDRESS, 1, 'QuickSwap');
+                const wethValue = 1 / usdcValue;
+                document.getElementById('usdcValue').textContent = usdcValue.toFixed(6);
+                document.getElementById('wethValue').textContent = wethValue.toFixed(6);
             } catch (error) {
-                console.error('Error updating token values:', error);
+                console.error('Error fetching token values:', error);
             }
         }
 
-        updateTokenValues();
-        setInterval(updateTokenValues, 60000); // Atualiza a cada minuto
+        fetchTokenValues();
+        setInterval(fetchTokenValues, 60000); // Update token values every minute
     </script>
 </body>
 </html>
