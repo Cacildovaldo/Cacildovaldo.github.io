@@ -157,10 +157,10 @@
             }
 
             const assets = [USDC_ADDRESS];
-            const amounts = [ethers.utils.parseUnits(loanAmount.toString(), 6)];
+            const amounts = [ethers.utils.parseUnits(loanAmount.toString(), 6)]; // USDC has 6 decimals
             const modes = [0]; // Modos de dívida
 
-            // Codifique os parâmetros arbitragem
+            // Codifique os parâmetros de arbitragem
             const arbitrageParams = ethers.utils.defaultAbiCoder.encode(
                 ['address', 'address', 'uint256'],
                 [USDC_ADDRESS, WETH_ADDRESS, ethers.utils.parseUnits(loanAmount.toString(), 6)]
@@ -170,6 +170,11 @@
                 // Estime o custo de gás
                 const gasEstimate = await estimateGasCost();
 
+                // Calcula a taxa proporcional ao valor do empréstimo
+                const flashLoanFee = loanAmount * 0.0009; // 0.09% fee
+                const totalRepayment = loanAmount + flashLoanFee;
+
+                // Executa a arbitragem
                 const tx = await contract.executeArbitrage(assets, amounts, modes, arbitrageParams, {
                     gasLimit: gasEstimate.gasLimit,
                     gasPrice: gasEstimate.gasPrice
@@ -200,7 +205,7 @@
 
         function log(message) {
             const logsElement = document.getElementById('logs');
-            logsElement.textContent = `${message}\n${logsElement.textContent}`;
+            logsElement.textContent += `${new Date().toISOString()}: ${message}\n`;
         }
 
         document.getElementById('connectWallet').addEventListener('click', connectWallet);
