@@ -29,7 +29,16 @@
 
     <script>
         const contractAddress = '0xf3feaE30F6D823fE03A276DF19c50cBb36A822EE';
-        const contractABI = [{"inputs":[{"internalType":"address","name":"_addressProvider","type":"address"}],"stateMutability":"nonpayable","type":"constructor"},{"inputs":[],"name":"ADDRESSES_PROVIDER","outputs":[{"internalType":"contract IPoolAddressesProvider","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"_token","type":"address"},{"internalType":"uint256","name":"_amount","type":"uint256"},{"internalType":"uint8[]","name":"_dexList","type":"uint8[]"},{"internalType":"address[]","name":"_pairs","type":"address[]"},{"internalType":"uint256","name":"profit","type":"uint256"},{"internalType":"uint256","name":"timestamp","type":"uint256"},{"internalType":"uint256","name":"nonce","type":"uint256"},{"internalType":"bytes","name":"_signature","type":"bytes"}],"name":"ArbitrageOverdome","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"POOL","outputs":[{"internalType":"contract IPool","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"asset","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"},{"internalType":"uint256","name":"premium","type":"uint256"},{"internalType":"address","name":"initiator","type":"address"},{"internalType":"bytes","name":"params","type":"bytes"}],"name":"executeOperation","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"bytes32","name":"","type":"bytes32"}],"name":"isValidSign","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"token","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"withdrawFunds","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"},{"stateMutability":"payable","type":"receive"}];
+        const contractABI = [
+            {"inputs":[{"internalType":"address","name":"_addressProvider","type":"address"}],"stateMutability":"nonpayable","type":"constructor"},
+            {"inputs":[],"name":"ADDRESSES_PROVIDER","outputs":[{"internalType":"contract IPoolAddressesProvider","name":"","type":"address"}],"stateMutability":"view","type":"function"},
+            {"inputs":[{"internalType":"address","name":"_token","type":"address"},{"internalType":"uint256","name":"_amount","type":"uint256"},{"internalType":"uint8[]","name":"_dexList","type":"uint8[]"},{"internalType":"address[]","name":"_pairs","type":"address[]"},{"internalType":"uint256","name":"profit","type":"uint256"},{"internalType":"uint256","name":"timestamp","type":"uint256"},{"internalType":"uint256","name":"nonce","type":"uint256"},{"internalType":"bytes","name":"_signature","type":"bytes"}],"name":"ArbitrageOverdome","outputs":[],"stateMutability":"nonpayable","type":"function"},
+            {"inputs":[],"name":"POOL","outputs":[{"internalType":"contract IPool","name":"","type":"address"}],"stateMutability":"view","type":"function"},
+            {"inputs":[{"internalType":"address","name":"asset","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"},{"internalType":"uint256","name":"premium","type":"uint256"},{"internalType":"address","name":"initiator","type":"address"},{"internalType":"bytes","name":"params","type":"bytes"}],"name":"executeOperation","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"},
+            {"inputs":[{"internalType":"bytes32","name":"","type":"bytes32"}],"name":"isValidSign","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},
+            {"inputs":[{"internalType":"address","name":"token","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"withdrawFunds","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"},
+            {"stateMutability":"payable","type":"receive"}
+        ];
 
         const USDC_ADDRESS = '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359';
         const WETH_ADDRESS = '0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619';
@@ -44,12 +53,12 @@
                     provider = new ethers.providers.Web3Provider(window.ethereum);
                     signer = provider.getSigner();
                     contract = new ethers.Contract(contractAddress, contractABI, signer);
-
+                    
                     const network = await provider.getNetwork();
                     if (network.chainId !== 137) { // Polygon MainNet chain ID
                         throw new Error('Please connect to Polygon MainNet');
                     }
-
+                    
                     document.getElementById('connectWallet').textContent = 'Connected';
                     document.getElementById('executeArbitrage').disabled = false;
                     checkArbitrageOpportunity();
@@ -59,6 +68,39 @@
                 }
             } else {
                 setStatus('Please install MetaMask!', 'error');
+            }
+        }
+
+        async function getPriceFromUniswapV2(tokenA, tokenB) {
+            try {
+                const query = `
+                    {
+                        pair(id: "${tokenA.toLowerCase()}-${tokenB.toLowerCase()}") {
+                            token0Price
+                            token1Price
+                        }
+                    }
+                `;
+                const response = await axios.post('https://api.thegraph.com/subgraphs/name/uniswap/uniswap-v2', { query });
+
+                if (response.data.errors) {
+                    throw new Error('Error from The Graph: ' + JSON.stringify(response.data.errors));
+                }
+
+                const pairData = response.data.data.pair;
+                const priceAtoB = parseFloat(pairData.token0Price);
+                const priceBtoA = parseFloat(pairData.token1Price);
+
+                if (priceAtoB <= 0 || priceBtoA <= 0) {
+                    throw new Error('Invalid price data');
+                }
+
+                // Return the price of tokenA in terms of tokenB
+                return priceAtoB / priceBtoA;
+            } catch (error) {
+                console.error('Error getting price from Uniswap V2:', error);
+                setStatus('Error getting price from Uniswap V2: ' + error.message, 'error');
+                throw error;
             }
         }
 
@@ -81,128 +123,88 @@
                     return;
                 }
 
-                const [priceUSDCWETH, priceWETHUSDC] = await Promise.all([
+                const [priceExchange1, priceExchange2] = await Promise.all([
                     getPriceFromUniswapV2(USDC_ADDRESS, WETH_ADDRESS),
                     getPriceFromUniswapV2(WETH_ADDRESS, USDC_ADDRESS)
                 ]);
-
-                if (priceUSDCWETH <= 0 || priceWETHUSDC <= 0) {
-                    setStatus('Invalid price data from Uniswap', 'error');
-                    isChecking = false;
-                    return;
-                }
 
                 const flashLoanFee = loanAmount * 0.0009;
                 const estimatedGasCost = await estimateGasCost();
                 const slippage = parseFloat(document.getElementById('slippage').value) / 100;
 
-                const potentialProfit = Math.abs(priceUSDCWETH - priceWETHUSDC) - flashLoanFee - estimatedGasCost;
+                const potentialProfit = Math.abs(priceExchange1 - priceExchange2) - flashLoanFee - estimatedGasCost;
                 const profitPercentage = (potentialProfit / loanAmount) * 100;
 
                 if (profitPercentage > slippage) {
-                    setStatus(`Arbitrage opportunity found! Potential profit: ${potentialProfit.toFixed(4)} USDC (${profitPercentage.toFixed(2)}%)`, 'success');
-                    document.getElementById('profit').textContent = profitPercentage.toFixed(2);
-                    document.getElementById('profitAmount').textContent = potentialProfit.toFixed(4);
+                    setStatus(`Arbitrage opportunity found! Potential profit: ${profitPercentage.toFixed(2)}%`, 'success');
                     document.getElementById('executeArbitrage').disabled = false;
                 } else {
-                    setStatus('No arbitrage opportunity found', 'error');
+                    setStatus('No arbitrage opportunity found', 'info');
                     document.getElementById('executeArbitrage').disabled = true;
                 }
+
+                document.getElementById('usdAmount').textContent = loanAmount.toFixed(2);
+                document.getElementById('lenderFee').textContent = flashLoanFee.toFixed(2);
+                document.getElementById('paybackAmount').textContent = (loanAmount + flashLoanFee).toFixed(2);
+                document.getElementById('profit').textContent = profitPercentage.toFixed(2);
+                document.getElementById('profitAmount').textContent = (loanAmount * (profitPercentage / 100)).toFixed(2);
+
             } catch (error) {
                 console.error('Error checking arbitrage opportunity:', error);
                 setStatus('Error checking arbitrage opportunity: ' + error.message, 'error');
-            } finally {
-                isChecking = false;
             }
-        }
 
-        async function getPriceFromUniswapV2(tokenA, tokenB) {
-            try {
-                const response = await axios.get(`https://api.thegraph.com/subgraphs/name/uniswap/uniswap-v2`, {
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    data: JSON.stringify({
-                        query: `
-                            {
-                                pair(id: "${tokenA}-${tokenB}") {
-                                    token0Price
-                                    token1Price
-                                }
-                            }
-                        `
-                    })
-                });
-
-                const priceAtoB = parseFloat(response.data.data.pair.token0Price);
-                const priceBtoA = parseFloat(response.data.data.pair.token1Price);
-
-                return priceAtoB / priceBtoA;
-            } catch (error) {
-                console.error('Error getting price from Uniswap V2:', error);
-                throw error;
-            }
-        }
-
-        async function getTokenDecimals(tokenAddress) {
-            try {
-                const token = new ethers.Contract(tokenAddress, ["function decimals() view returns (uint8)"], provider);
-                return await token.decimals();
-            } catch (error) {
-                console.error('Error getting token decimals:', error);
-                throw error;
-            }
+            isChecking = false;
+            setTimeout(checkArbitrageOpportunity, 10000);
         }
 
         async function estimateGasCost() {
-            try {
-                const gasPrice = await provider.getGasPrice();
-                const estimatedGasLimit = ethers.BigNumber.from('21000'); // Estimativa simplificada
-                return gasPrice.mul(estimatedGasLimit);
-            } catch (error) {
-                console.error('Error estimating gas cost:', error);
-                throw error;
-            }
+            // Placeholder function for estimating gas cost
+            return 0.001; // Example value, replace with actual gas cost estimation
         }
 
         async function executeArbitrage() {
+            if (!contract) return;
+
             try {
-                const loanAmount = ethers.utils.parseUnits(document.getElementById('loanAmount').value, 6); // Assumindo 6 casas decimais para USDC
-                const dexList = [0, 1]; // DEX IDs
-                const pairs = [USDC_ADDRESS, WETH_ADDRESS];
-                const profit = ethers.utils.parseUnits(document.getElementById('profitAmount').textContent, 6);
-                const timestamp = Math.floor(Date.now() / 1000);
-                const nonce = Math.floor(Math.random() * 1e6);
-                const signature = '0x'; // Assinatura vazia para simplificação
+                const loanAmount = parseFloat(document.getElementById('loanAmount').value) || 0;
+                const profitPercentage = parseFloat(document.getElementById('profit').textContent) || 0;
+
+                if (loanAmount <= 0 || profitPercentage <= 0) {
+                    setStatus('Invalid loan amount or profit percentage', 'error');
+                    return;
+                }
+
+                const dexList = [0, 1]; // Uniswap (0), Sushiswap (1)
+                const pairs = [
+                    USDC_ADDRESS,
+                    WETH_ADDRESS,
+                    WETH_ADDRESS,
+                    USDC_ADDRESS
+                ];
 
                 const tx = await contract.ArbitrageOverdome(
                     USDC_ADDRESS,
-                    loanAmount,
+                    ethers.utils.parseUnits(loanAmount.toString(), 6),
                     dexList,
                     pairs,
-                    profit,
-                    timestamp,
-                    nonce,
-                    signature
+                    ethers.utils.parseUnits((loanAmount * (profitPercentage / 100)).toString(), 6),
+                    Math.floor(Date.now() / 1000),
+                    1, // Nonce (replace with actual nonce)
+                    '0x' // Replace with actual signature
                 );
 
-                setStatus(`Transaction sent: ${tx.hash}`, 'success');
+                setStatus('Transaction sent! Waiting for confirmation...', 'info');
                 await tx.wait();
-                setStatus('Arbitrage executed successfully', 'success');
+                setStatus('Arbitrage executed successfully!', 'success');
+
             } catch (error) {
                 console.error('Error executing arbitrage:', error);
                 setStatus('Error executing arbitrage: ' + error.message, 'error');
             }
         }
 
-        function setStatus(message, type) {
-            const statusEl = document.getElementById('status');
-            statusEl.textContent = message;
-            statusEl.className = type;
-        }
-
         document.getElementById('connectWallet').addEventListener('click', connectWallet);
-        document.getElementById('loanAmount').addEventListener('input', checkArbitrageOpportunity);
         document.getElementById('executeArbitrage').addEventListener('click', executeArbitrage);
     </script>
 </body>
