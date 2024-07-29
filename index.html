@@ -1,36 +1,6 @@
 <!DOCTYPE html>
 <html data-critters-container="" style="--w3o-background-color: #1A1D26; --w3o-foreground-color: #242835; --w3o-text-color: #EFF1FC; --w3o-border-color: #33394B; --w3o-action-color: #929bed; --w3o-border-radius: 16px; --w3o-font-family: inherit;" class="" lang="en-US"><head><head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Arbitragem DeFi</title>
-    <link rel="stylesheet" href="style.css">
-    <script src="runtime.4dc27f973ef8498d.js" defer></script>
-    <script src="polyfills.32f0f05a03a79b5e.js" defer></script>
-    <script src="main.cbf9b1f5d903b603.js" defer></script>
-</head>
-<body>
-    <header>
-        <h1>Arbitragem DeFi com Flash Loans</h1>
-        <button id="connectButton">Conectar Carteira</button>
-    </header>
-    <main>
-        <section id="info">
-            <h2>Informações</h2>
-            <p>Seu saldo: <span id="balance">0</span> MATIC</p>
-        </section>
-        <section id="actions">
-            <h2>Operações</h2>
-            <label for="loanAmount">Valor do Empréstimo Flash:</label>
-            <input type="number" id="loanAmount" name="loanAmount" min="0" step="0.01">
-            <button id="startArbitrage">Iniciar Arbitragem</button>
-            <h2>Histórico de Negociações</h2>
-            <div id="tradeHistory"></div>
-        </section>
-    </main>
-    <footer>
-        <p>&copy; 2024 Arbitragem DeFi. Todos os direitos reservados.</p>
-    </footer>
-    <script>
+
         const contractAddress = "0xf3feaE30F6D823fE03A276DF19c50cBb36A822EE";
         const contractABI = [{"inputs":[{"internalType":"address","name":"_addressProvider","type":"address"}],"stateMutability":"nonpayable","type":"constructor"},{"inputs":[],"name":"ADDRESSES_PROVIDER","outputs":[{"internalType":"contract IPoolAddressesProvider","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"_token","type":"address"},{"internalType":"uint256","name":"_amount","type":"uint256"},{"internalType":"uint8[]","name":"_dexList","type":"uint8[]"},{"internalType":"address[]","name":"_pairs","type":"address[]"},{"internalType":"uint256","name":"profit","type":"uint256"},{"internalType":"uint256","name":"timestamp","type":"uint256"},{"internalType":"uint256","name":"nonce","type":"uint256"},{"internalType":"bytes","name":"_signature","type":"bytes"}],"name":"ArbitrageOverdome","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"POOL","outputs":[{"internalType":"contract IPool","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"asset","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"},{"internalType":"uint256","name":"premium","type":"uint256"},{"internalType":"address","name":"initiator","type":"address"},{"internalType":"bytes","name":"params","type":"bytes"}],"name":"executeOperation","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"bytes32","name":"","type":"bytes32"}],"name":"isValidSign","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"token","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"withdrawFunds","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"},{"stateMutability":"payable","type":"receive"}];
 
