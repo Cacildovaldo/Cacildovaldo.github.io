@@ -235,14 +235,14 @@
                     document.getElementById('profitAmount').textContent = potentialProfit.toFixed(4);
                     document.getElementById('executeArbitrage').disabled = false;
                 } else {
-                    setStatus('No profitable arbitrage opportunity at the moment', 'error');
+                    setStatus('No profitable arbitrage opportunity at the moment', 'info');
                     document.getElementById('profit').textContent = '0';
                     document.getElementById('profitAmount').textContent = '0';
                     document.getElementById('executeArbitrage').disabled = true;
                 }
             } catch (error) {
                 console.error('Error checking arbitrage opportunity:', error);
-                setStatus('Error checking arbitrage opportunity', 'error');
+                setStatus('Error checking arbitrage opportunity: ' + error.message, 'error');
             }
 
             isChecking = false;
@@ -295,7 +295,7 @@
                 setStatus('Arbitrage executed successfully!', 'success');
             } catch (error) {
                 console.error('Error executing arbitrage:', error);
-                setStatus('Error executing arbitrage', 'error');
+                setStatus('Error executing arbitrage: ' + error.message, 'error');
             }
         }
 
@@ -307,6 +307,7 @@
 
         document.getElementById('connectWallet').addEventListener('click', connectWallet);
         document.getElementById('executeArbitrage').addEventListener('click', executeArbitrage);
+        document.getElementById('loanAmount').addEventListener('input', checkArbitrageOpportunity);
     </script>
 </body>
 </html>
