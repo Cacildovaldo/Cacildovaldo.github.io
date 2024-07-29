@@ -36,7 +36,32 @@
 
     <script>
         const contractAddress = '0x8F65C155cBFc34C09583a74fEBc581DCd5Cae34E';
-        const contractABI = [{"inputs":[{"internalType":"address[]","name":"_assets","type":"address[]"},{"internalType":"uint256[]","name":"_amounts","type":"uint256[]"},{"internalType":"uint256[]","name":"_modes","type":"uint256[]"},{"internalType":"bytes","name":"_params","type":"bytes"}],"name":"executeArbitrage","outputs":[],"stateMutability":"nonpayable","type":"function"}];
+        const contractABI = [
+            {
+                "inputs": [
+                    {"internalType": "address[]", "name": "_assets", "type": "address[]"},
+                    {"internalType": "uint256[]", "name": "_amounts", "type": "uint256[]"},
+                    {"internalType": "uint256[]", "name": "_modes", "type": "uint256[]"},
+                    {"internalType": "bytes", "name": "_params", "type": "bytes"}
+                ],
+                "name": "executeArbitrage",
+                "outputs": [],
+                "stateMutability": "nonpayable",
+                "type": "function"
+            },
+            {
+                "inputs": [
+                    {"internalType": "address[]", "name": "assets", "type": "address[]"},
+                    {"internalType": "uint256[]", "name": "amounts", "type": "uint256[]"},
+                    {"internalType": "uint256[]", "name": "premiums", "type": "uint256[]"},
+                    {"internalType": "bytes", "name": "params", "type": "bytes"}
+                ],
+                "name": "executeOperation",
+                "outputs": [{"internalType": "bool", "name": "", "type": "bool"}],
+                "stateMutability": "nonpayable",
+                "type": "function"
+            }
+        ];
 
         const USDC_ADDRESS = '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174';
         const WETH_ADDRESS = '0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619';
@@ -95,60 +120,44 @@
                     getPriceFromDex(USDC_ADDRESS, WETH_ADDRESS, loanAmount, 'SushiSwap')
                 ]);
 
-                const flashLoanFee = loanAmount * 0.0009;
-                const estimatedGasCost = await estimateGasCost();
+                const flashLoanFee = loanAmount * 0.0009; // 0.09%
+                const totalRepayment = loanAmount + flashLoanFee;
+
+                const profit = Math.max(priceQuickSwap - priceSushiSwap, priceSushiSwap - priceQuickSwap);
                 const slippage = parseFloat(document.getElementById('slippage').value) / 100;
-
-                const potentialProfit = Math.abs(priceQuickSwap - priceSushiSwap) - flashLoanFee - estimatedGasCost;
-                const profitPercentage = (potentialProfit / loanAmount) * 100;
-
-                if (profitPercentage > slippage) {
-                    setStatus(`Arbitrage opportunity found! Potential profit: ${potentialProfit.toFixed(4)} USDC (${profitPercentage.toFixed(2)}%)`, 'success');
-                    document.getElementById('profit').textContent = profitPercentage.toFixed(2);
-                    document.getElementById('profitAmount').textContent = potentialProfit.toFixed(4);
+                const adjustedProfit = profit - (profit * slippage);
+                
+                if (adjustedProfit > flashLoanFee) {
+                    setStatus('Arbitrage opportunity detected!', 'success');
                 } else {
-                    setStatus('No profitable arbitrage opportunity at the moment', 'info');
+                    setStatus('No arbitrage opportunity detected', 'info');
                 }
 
-                document.getElementById('usdAmount').textContent = loanAmount.toFixed(2);
-                document.getElementById('lenderFee').textContent = flashLoanFee.toFixed(4);
-                document.getElementById('paybackAmount').textContent = (loanAmount + flashLoanFee).toFixed(4);
+                document.getElementById('usdcValue').textContent = priceQuickSwap;
+                document.getElementById('wethValue').textContent = priceSushiSwap;
+                document.getElementById('lenderFee').textContent = flashLoanFee.toFixed(2);
+                document.getElementById('paybackAmount').textContent = totalRepayment.toFixed(2);
+                document.getElementById('profit').textContent = (adjustedProfit * 100).toFixed(2);
+                document.getElementById('profitAmount').textContent = adjustedProfit.toFixed(2);
 
             } catch (error) {
                 console.error('Error checking arbitrage opportunity:', error);
                 setStatus('Error checking arbitrage opportunity: ' + error.message, 'error');
             } finally {
                 isChecking = false;
-                setTimeout(checkArbitrageOpportunity, 10000);
             }
         }
 
-        async function getPriceFromDex(tokenIn, tokenOut, amount, dexName) {
-            try {
-                // Aqui você deve implementar a lógica para obter o preço real da DEX
-                // Este é apenas um exemplo e não reflete preços reais
-                const basePrice = dexName === 'QuickSwap' ? 1800 : 1795;
-                return basePrice * (1 + Math.random() * 0.01);
-            } catch (error) {
-                console.error(`Error getting price from ${dexName}:`, error);
-                return 0;
-            }
+        async function getPriceFromDex(tokenIn, tokenOut, amount, dex) {
+            // Dummy function: replace with actual implementation
+            // You need to integrate with DEX APIs to get real-time prices
+            return parseFloat(amount) * 0.99; // Mock price
         }
 
-        async function estimateGasCost() {
+        async function estimateGasCost(method, params) {
             try {
-                const loanAmount = parseFloat(document.getElementById('loanAmount').value) || 0;
-                if (loanAmount <= 0) return 0;
-
-                const gasPrice = await provider.getGasPrice();
-                const gasEstimate = await contract.estimateGas.executeArbitrage(
-                    [USDC_ADDRESS, WETH_ADDRESS],
-                    [ethers.utils.parseUnits(loanAmount.toString(), 6), ethers.utils.parseUnits(loanAmount.toString(), 18)],
-                    [0, 0],
-                    []
-                );
-
-                return ethers.utils.formatUnits(gasEstimate.mul(gasPrice), 'ether');
+                const gasEstimate = await contract.estimateGas[method](...params);
+                return gasEstimate.toNumber();
             } catch (error) {
                 console.error('Error estimating gas cost:', error);
                 return 0;
@@ -160,6 +169,18 @@
                 const loanAmount = parseFloat(document.getElementById('loanAmount').value) || 0;
                 if (loanAmount <= 0) {
                     setStatus('Please enter a valid loan amount', 'error');
+                    return;
+                }
+
+                const gasEstimate = await estimateGasCost('executeArbitrage', [
+                    [USDC_ADDRESS, WETH_ADDRESS],
+                    [ethers.utils.parseUnits(loanAmount.toString(), 6), ethers.utils.parseUnits(loanAmount.toString(), 18)],
+                    [0, 0],
+                    []
+                ]);
+
+                if (gasEstimate === 0) {
+                    setStatus('Error estimating gas cost', 'error');
                     return;
                 }
 
