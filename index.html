@@ -6,6 +6,7 @@
     <title>Arbitragem com Flash Loan Otimizada</title>
     <script src="https://cdn.ethers.io/lib/ethers-5.0.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script src="https://unpkg.com/@uniswap/sdk@3.0.1/dist/uniswap-sdk.min.js"></script>
     <style>
         body { font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; }
         button, input { margin: 10px 0; }
@@ -33,6 +34,8 @@
 
         const USDC_ADDRESS = '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359';
         const WETH_ADDRESS = '0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619';
+        const UNISWAP_V3_FACTORY_ADDRESS = '0x1F98431c8aD98523631AE4a59f267346ea31F984';
+        const UNISWAP_V3_POOL_INIT_CODE_HASH = '0xe34f55d1faba6c8ff9dd2513e707f01fada89cd45d9b1e9de8a837b7bcd3f30b';
 
         let provider, signer, contract;
         let isChecking = false;
@@ -82,8 +85,8 @@
                 }
 
                 const [priceExchange1, priceExchange2] = await Promise.all([
-                    getPriceFromExchange1(USDC_ADDRESS, WETH_ADDRESS, loanAmount),
-                    getPriceFromExchange2(USDC_ADDRESS, WETH_ADDRESS, loanAmount)
+                    getPriceFromUniswapV3(USDC_ADDRESS, WETH_ADDRESS, loanAmount),
+                    getPriceFromUniswapV3(WETH_ADDRESS, USDC_ADDRESS, loanAmount)
                 ]);
 
                 const flashLoanFee = loanAmount * 0.0009;
@@ -113,16 +116,27 @@
             setTimeout(checkArbitrageOpportunity, 10000);
         }
 
-        async function getPriceFromExchange1(tokenIn, tokenOut, amount) {
-            // Em um cenário real, isso faria uma chamada API para um oráculo de preço ou API DEX
-            const response = await axios.get(`https://api.exchange1.com/price?tokenIn=${tokenIn}&tokenOut=${tokenOut}&amount=${amount}`);
-            return response.data.price;
+        async function getPriceFromUniswapV3(tokenIn, tokenOut, amount) {
+            const chainId = 137; // Polygon MainNet
+            const [tokenInDecimals, tokenOutDecimals] = await Promise.all([
+                getTokenDecimals(tokenIn),
+                getTokenDecimals(tokenOut)
+            ]);
+
+            const amountIn = ethers.utils.parseUnits(amount.toString(), tokenInDecimals);
+            const poolAddress = UniswapV3.getPoolAddress(tokenIn, tokenOut, 3000, UNISWAP_V3_FACTORY_ADDRESS, UNISWAP_V3_POOL_INIT_CODE_HASH);
+
+            const pool = new ethers.Contract(poolAddress, UniswapV3.POOL_ABI, provider);
+            const slot0 = await pool.slot0();
+            const sqrtPriceX96 = slot0.sqrtPriceX96;
+            const price = UniswapV3.getPriceFromSqrtPriceX96(sqrtPriceX96, tokenInDecimals, tokenOutDecimals);
+
+            return amountIn.mul(price).div(ethers.utils.parseUnits('1', tokenOutDecimals)).toNumber();
         }
 
-        async function getPriceFromExchange2(tokenIn, tokenOut, amount) {
-            // Em um cenário real, isso faria uma chamada API para um oráculo de preço ou API DEX
-            const response = await axios.get(`https://api.exchange2.com/price?tokenIn=${tokenIn}&tokenOut=${tokenOut}&amount=${amount}`);
-            return response.data.price;
+        async function getTokenDecimals(tokenAddress) {
+            const token = new ethers.Contract(tokenAddress, ["function decimals() view returns (uint8)"], provider);
+            return await token.decimals();
         }
 
         async function estimateGasCost() {
