@@ -34,4 +34,56 @@
   src: url("https://rsms.me/inter/font-files/Inter-roman.var.woff2?v=3.19") format("woff2");
 }
 
-  </style><div class="cdk-overlay-container"></div></body></html>
+  </style><div class="cdk-overlay-container"></div><script>
+  const walletContainer = document.getElementById('wallet-container');
+  const provider = new WalletConnectProvider.default({
+    rpc: {
+      // Add the appropriate RPC URL for the network you're using
+      // For example, Polygon Matic network:
+      // "https://polygon-rpc.com"
+    },
+    bridge: "https://bridge.walletconnect.org",
+  });
+
+  async function connectWallet() {
+    if (provider.connected) {
+      return;
+    }
+
+    await provider.enable();
+    const web3 = new Web3(provider);
+    const accounts = await web3.eth.getAccounts();
+
+    // Update the UI with the connected wallet address
+    walletContainer.innerHTML = `Connected: <span id="wallet-text">${accounts[0].slice(0, 6)}...${accounts[0].slice(-4)}</span>`;
+
+    // Add event listeners for wallet events here, if needed
+  }
+
+  async function disconnectWallet() {
+    if (!provider.connected) {
+      return;
+    }
+
+    await provider.disconnect();
+    walletContainer.innerHTML = '<button id="wallet-btn" class="flex items-center bg-[#203046] hover:bg-[#203046]/90 text-white font-medium py-2 px-4 rounded">Connect Wallet</button>';
+
+    // Remove event listeners for wallet events here, if needed
+  }
+
+  // Initialize the WalletConnect button and event listeners
+  connectWallet();
+
+  const connectWalletBtn = document.getElementById('wallet-btn');
+  connectWalletBtn.onclick = connectWallet;
+
+  provider.on("connect", (error, payload) => {
+    console.log("Connected", payload);
+    connectWallet();
+  });
+
+  provider.on("disconnect", (error, payload) => {
+    console.log("Disconnected", payload);
+    disconnectWallet();
+  });
+</script></body><div id="wallet-container"></div></html>
