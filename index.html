@@ -71,6 +71,7 @@
 
             try {
                 const balance = await provider.getBalance(await signer.getAddress());
+                console.log('Wallet Balance:', ethers.utils.formatEther(balance));
                 if (balance.lt(ethers.utils.parseEther('0.1'))) {
                     setStatus('Insufficient MATIC balance for network fees', 'error');
                     isChecking = false;
@@ -78,6 +79,7 @@
                 }
 
                 const loanAmount = parseFloat(document.getElementById('loanAmount').value) || 0;
+                console.log('Loan Amount:', loanAmount);
                 if (loanAmount <= 0) {
                     setStatus('Please enter a valid loan amount', 'error');
                     isChecking = false;
@@ -89,12 +91,21 @@
                     getPriceFromUniswapV3(WETH_ADDRESS, USDC_ADDRESS, loanAmount)
                 ]);
 
+                console.log('Price Exchange 1:', priceExchange1);
+                console.log('Price Exchange 2:', priceExchange2);
+
                 const flashLoanFee = loanAmount * 0.0009;
                 const estimatedGasCost = await estimateGasCost();
                 const slippage = parseFloat(document.getElementById('slippage').value) / 100;
 
                 const potentialProfit = Math.abs(priceExchange1 - priceExchange2) - flashLoanFee - estimatedGasCost;
                 const profitPercentage = (potentialProfit / loanAmount) * 100;
+
+                console.log('Flash Loan Fee:', flashLoanFee);
+                console.log('Estimated Gas Cost:', ethers.utils.formatEther(estimatedGasCost));
+                console.log('Slippage:', slippage);
+                console.log('Potential Profit:', potentialProfit);
+                console.log('Profit Percentage:', profitPercentage);
 
                 if (profitPercentage > slippage) {
                     setStatus(`Arbitrage opportunity found! Potential profit: ${potentialProfit.toFixed(4)} USDC (${profitPercentage.toFixed(2)}%)`, 'success');
