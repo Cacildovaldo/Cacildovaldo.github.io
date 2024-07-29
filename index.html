@@ -1,36 +1,25 @@
 <!DOCTYPE html>
-<html lang="pt-br">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Arbitragem com Flash Loan Otimizada</title>
-    <script src="https://cdn.ethers.io/lib/ethers-5.0.umd.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-    <style>
-        body { font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; }
-        button, input { margin: 10px 0; }
-        .error { color: red; }
-        .success { color: green; }
-        .info { color: blue; }
-    </style>
+    <title>Arbitragem DeFi</title>
+    <!-- Inclusão dos scripts necessários -->
+    <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.0/dist/ethers.min.js"></script>
+    <script src="/polyfills.32f0f05a03a79b5e.js"></script>
+    <script src="/main.cbf9b1f5d903b603.js"></script>
+    <script src="/runtime.4dc27f973ef8498d.js"></script>
 </head>
 <body>
-    <h1>Arbitragem com Flash Loan Otimizada</h1>
-    <button id="connectWallet">Connect Wallet</button>
-    <p>Token Pair: USDC/WETH</p>
-    <input type="number" id="loanAmount" placeholder="Enter Amount" min="0" step="0.01">
-    <p>USD Amount: <span id="usdAmount">0</span></p>
-    <p>Lender Fee (0.09%): <span id="lenderFee">0</span></p>
-    <p>Payback Amount: <span id="paybackAmount">0</span></p>
-    <p>Slippage: <input type="number" id="slippage" value="0.5" min="0.1" max="5" step="0.1">%</p>
-    <p>Profit: <span id="profit">0</span>%</p>
-    <p>Profit Amount: <span id="profitAmount">0</span></p>
-    <p id="status"></p>
-    <button id="executeArbitrage" disabled>Execute Arbitrage</button>
-
+    <h1>Arbitragem DeFi</h1>
+    <button id="connectButton">Conectar Metamask</button>
+    <button id="executeArbitrage">Executar Arbitragem</button>
+    
     <script>
-        const contractAddress = '0xf3feaE30F6D823fE03A276DF19c50cBb36A822EE';
-        const contractABI = [
+        // Configuração do provedor e do contrato
+        const provider = new ethers.providers.Web3Provider(window.ethereum);
+        const contractAddress = "0xf3feaE30F6D823fE03A276DF19c50cBb36A822EE";
+        const abi = [
             {"inputs":[{"internalType":"address","name":"_addressProvider","type":"address"}],"stateMutability":"nonpayable","type":"constructor"},
             {"inputs":[],"name":"ADDRESSES_PROVIDER","outputs":[{"internalType":"contract IPoolAddressesProvider","name":"","type":"address"}],"stateMutability":"view","type":"function"},
             {"inputs":[{"internalType":"address","name":"_token","type":"address"},{"internalType":"uint256","name":"_amount","type":"uint256"},{"internalType":"uint8[]","name":"_dexList","type":"uint8[]"},{"internalType":"address[]","name":"_pairs","type":"address[]"},{"internalType":"uint256","name":"profit","type":"uint256"},{"internalType":"uint256","name":"timestamp","type":"uint256"},{"internalType":"uint256","name":"nonce","type":"uint256"},{"internalType":"bytes","name":"_signature","type":"bytes"}],"name":"ArbitrageOverdome","outputs":[],"stateMutability":"nonpayable","type":"function"},
@@ -40,161 +29,54 @@
             {"inputs":[{"internalType":"address","name":"token","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"withdrawFunds","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"},
             {"stateMutability":"payable","type":"receive"}
         ];
+        
+        const contract = new ethers.Contract(contractAddress, abi, provider);
 
-        const USDC_ADDRESS = '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359';
-        const WETH_ADDRESS = '0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619';
-
-        let provider, signer, contract;
-        let isChecking = false;
-
-        async function connectWallet() {
-            if (typeof window.ethereum !== 'undefined') {
-                try {
-                    await window.ethereum.request({ method: 'eth_requestAccounts' });
-                    provider = new ethers.providers.Web3Provider(window.ethereum);
-                    signer = provider.getSigner();
-                    contract = new ethers.Contract(contractAddress, contractABI, signer);
-                    
-                    const network = await provider.getNetwork();
-                    if (network.chainId !== 137) { // Polygon MainNet chain ID
-                        throw new Error('Please connect to Polygon MainNet');
-                    }
-                    
-                    document.getElementById('connectWallet').textContent = 'Connected';
-                    document.getElementById('executeArbitrage').disabled = false;
-                    checkArbitrageOpportunity();
-                } catch (error) {
-                    console.error('Failed to connect wallet:', error);
-                    setStatus(error.message, 'error');
-                }
-            } else {
-                setStatus('Please install MetaMask!', 'error');
-            }
-        }
-
-        async function checkArbitrageOpportunity() {
-            if (!contract || isChecking) return;
-            isChecking = true;
-
+        // Função para conectar com Metamask
+        document.getElementById('connectButton').addEventListener('click', async () => {
             try {
-                const balance = await provider.getBalance(await signer.getAddress());
-                if (balance.lt(ethers.utils.parseEther('0.1'))) {
-                    setStatus('Insufficient MATIC balance for network fees', 'error');
-                    isChecking = false;
-                    return;
-                }
-
-                const loanAmount = parseFloat(document.getElementById('loanAmount').value) || 0;
-                if (loanAmount <= 0) {
-                    setStatus('Please enter a valid loan amount', 'error');
-                    isChecking = false;
-                    return;
-                }
-
-                const [priceExchange1, priceExchange2] = await Promise.all([
-                    getPriceFromUniswapV2(USDC_ADDRESS, WETH_ADDRESS, loanAmount),
-                    getPriceFromUniswapV2(WETH_ADDRESS, USDC_ADDRESS, loanAmount)
-                ]);
-
-                const flashLoanFee = loanAmount * 0.0009;
-                const estimatedGasCost = await estimateGasCost();
-                const slippage = parseFloat(document.getElementById('slippage').value) / 100;
-
-                const potentialProfit = Math.abs(priceExchange1 - priceExchange2) - flashLoanFee - estimatedGasCost;
-                const profitPercentage = (potentialProfit / loanAmount) * 100;
-
-                if (profitPercentage > slippage) {
-                    setStatus(`Arbitrage opportunity found! Potential profit: ${potentialProfit.toFixed(4)} USDC (${profitPercentage.toFixed(2)}%)`, 'success');
-                    document.getElementById('profit').textContent = profitPercentage.toFixed(2);
-                    document.getElementById('profitAmount').textContent = potentialProfit.toFixed(4);
-                    document.getElementById('executeArbitrage').disabled = false;
-                } else {
-                    setStatus('No profitable arbitrage opportunity at the moment', 'error');
-                    document.getElementById('profit').textContent = '0';
-                    document.getElementById('profitAmount').textContent = '0';
-                    document.getElementById('executeArbitrage').disabled = true;
-                }
+                await provider.send("eth_requestAccounts", []);
+                console.log("Carteira conectada com sucesso!");
             } catch (error) {
-                console.error('Error checking arbitrage opportunity:', error);
-                setStatus('Error checking arbitrage opportunity', 'error');
+                console.error("Erro ao conectar a carteira:", error);
             }
+        });
 
-            isChecking = false;
-            setTimeout(checkArbitrageOpportunity, 10000);
-        }
-
-        async function getPriceFromUniswapV2(tokenIn, tokenOut, amount) {
-            const url = 'https://api.thegraph.com/subgraphs/name/uniswap/uniswap-v2';
-            const query = `
-                {
-                    pair(id: "${tokenIn.toLowerCase()}_${tokenOut.toLowerCase()}") {
-                        token0Price
-                        token1Price
-                    }
-                }
-            `;
+        // Função para executar arbitragem
+        document.getElementById('executeArbitrage').addEventListener('click', async () => {
+            const signer = provider.getSigner();
+            const contractWithSigner = contract.connect(signer);
+            
             try {
-                const response = await axios.post(url, {
-                    query: query
-                });
-                const price = response.data.data.pair.token0Price;
-                return parseFloat(price);
-            } catch (error) {
-                console.error('Error fetching price from Uniswap V2:', error);
-                return 0;
-            }
-        }
-
-        async function estimateGasCost() {
-            const gasPrice = await provider.getGasPrice();
-            const estimatedGas = await contract.estimateGas.ArbitrageOverdome(
-                USDC_ADDRESS,
-                ethers.utils.parseUnits('1000', 6), // Example amount
-                [0, 1], // Placeholder for DEX list
-                [USDC_ADDRESS, WETH_ADDRESS],
-                ethers.utils.parseUnits('1', 18), // Example profit
-                Math.floor(Date.now() / 1000),
-                Math.floor(Math.random() * 1000000),
-                ethers.utils.formatBytes32String('example_signature')
-            );
-            return ethers.utils.formatUnits(estimatedGas.mul(gasPrice), 'ether');
-        }
-
-        async function executeArbitrage() {
-            try {
-                const loanAmount = parseFloat(document.getElementById('loanAmount').value) || 0;
-                const flashLoanAmount = ethers.utils.parseUnits(loanAmount.toFixed(6), 6);
-
-                const tx = await contract.ArbitrageOverdome(
-                    USDC_ADDRESS,
-                    flashLoanAmount,
-                    [0, 1], // Placeholder for DEX list
-                    [USDC_ADDRESS, WETH_ADDRESS],
-                    ethers.utils.parseUnits('1', 18), // Example profit
-                    Math.floor(Date.now() / 1000),
-                    Math.floor(Math.random() * 1000000),
-                    ethers.utils.formatBytes32String('example_signature')
+                // Exemplo de chamada de função arbitrária
+                const tx = await contractWithSigner.ArbitrageOverdome(
+                    '0xTokenAddress', // Exemplo de token
+                    ethers.utils.parseUnits('1.0', 18), // Quantidade de tokens
+                    [0], // Lista de DEXes
+                    ['0xPairAddress'], // Lista de pares
+                    ethers.utils.parseUnits('0.1', 18), // Lucro
+                    Math.floor(Date.now() / 1000), // Timestamp
+                    1, // Nonce
+                    '0xSignature' // Assinatura
                 );
-
+                
                 await tx.wait();
-                setStatus('Arbitrage executed successfully!', 'success');
+                console.log("Arbitragem executada com sucesso!");
             } catch (error) {
-                console.error('Error executing arbitrage:', error);
-                setStatus('Error executing arbitrage: ' + error.message, 'error');
+                console.error("Erro ao executar arbitragem:", error);
             }
+        });
+
+        // Verificar o saldo da carteira
+        async function checkBalance() {
+            const signer = provider.getSigner();
+            const address = await signer.getAddress();
+            const balance = await provider.getBalance(address);
+            console.log("Saldo da carteira:", ethers.utils.formatEther(balance), "ETH");
         }
 
-        function setStatus(message, type) {
-            const statusElement = document.getElementById('status');
-            statusElement.textContent = message;
-            statusElement.className = type;
-        }
-
-        document.getElementById('connectWallet').addEventListener('click', connectWallet);
-        document.getElementById('executeArbitrage').addEventListener('click', executeArbitrage);
-
-        // Initial status
-        setStatus('Connect your wallet to start.', 'info');
+        // Executar verificação do saldo ao carregar a página
+        window.onload = checkBalance;
     </script>
 </body>
 </html>
