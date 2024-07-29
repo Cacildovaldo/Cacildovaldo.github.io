@@ -6,7 +6,6 @@
     <title>Arbitragem com Flash Loan Otimizada</title>
     <script src="https://cdn.ethers.io/lib/ethers-5.0.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-    <script src="https://unpkg.com/@uniswap/sdk@3.0.1/dist/uniswap-sdk.min.js"></script>
     <style>
         body { font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; }
         button, input { margin: 10px 0; }
@@ -34,8 +33,6 @@
 
         const USDC_ADDRESS = '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359';
         const WETH_ADDRESS = '0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619';
-        const UNISWAP_V3_FACTORY_ADDRESS = '0x1F98431c8aD98523631AE4a59f267346ea31F984';
-        const UNISWAP_V3_POOL_INIT_CODE_HASH = '0xe34f55d1faba6c8ff9dd2513e707f01fada89cd45d9b1e9de8a837b7bcd3f30b';
 
         let provider, signer, contract;
         let isChecking = false;
@@ -47,12 +44,12 @@
                     provider = new ethers.providers.Web3Provider(window.ethereum);
                     signer = provider.getSigner();
                     contract = new ethers.Contract(contractAddress, contractABI, signer);
-                    
+
                     const network = await provider.getNetwork();
                     if (network.chainId !== 137) { // Polygon MainNet chain ID
                         throw new Error('Please connect to Polygon MainNet');
                     }
-                    
+
                     document.getElementById('connectWallet').textContent = 'Connected';
                     document.getElementById('executeArbitrage').disabled = false;
                     checkArbitrageOpportunity();
@@ -71,7 +68,6 @@
 
             try {
                 const balance = await provider.getBalance(await signer.getAddress());
-                console.log('Wallet Balance:', ethers.utils.formatEther(balance));
                 if (balance.lt(ethers.utils.parseEther('0.1'))) {
                     setStatus('Insufficient MATIC balance for network fees', 'error');
                     isChecking = false;
@@ -79,22 +75,18 @@
                 }
 
                 const loanAmount = parseFloat(document.getElementById('loanAmount').value) || 0;
-                console.log('Loan Amount:', loanAmount);
                 if (loanAmount <= 0) {
                     setStatus('Please enter a valid loan amount', 'error');
                     isChecking = false;
                     return;
                 }
 
-                const [priceExchange1, priceExchange2] = await Promise.all([
-                    getPriceFromUniswapV3(USDC_ADDRESS, WETH_ADDRESS, loanAmount),
-                    getPriceFromUniswapV3(WETH_ADDRESS, USDC_ADDRESS, loanAmount)
+                const [priceUSDCWETH, priceWETHUSDC] = await Promise.all([
+                    getPriceFromUniswapV2(USDC_ADDRESS, WETH_ADDRESS),
+                    getPriceFromUniswapV2(WETH_ADDRESS, USDC_ADDRESS)
                 ]);
 
-                console.log('Price Exchange 1:', priceExchange1);
-                console.log('Price Exchange 2:', priceExchange2);
-
-                if (priceExchange1 <= 0 || priceExchange2 <= 0) {
+                if (priceUSDCWETH <= 0 || priceWETHUSDC <= 0) {
                     setStatus('Invalid price data from Uniswap', 'error');
                     isChecking = false;
                     return;
@@ -104,14 +96,8 @@
                 const estimatedGasCost = await estimateGasCost();
                 const slippage = parseFloat(document.getElementById('slippage').value) / 100;
 
-                const potentialProfit = Math.abs(priceExchange1 - priceExchange2) - flashLoanFee - estimatedGasCost;
+                const potentialProfit = Math.abs(priceUSDCWETH - priceWETHUSDC) - flashLoanFee - estimatedGasCost;
                 const profitPercentage = (potentialProfit / loanAmount) * 100;
-
-                console.log('Flash Loan Fee:', flashLoanFee);
-                console.log('Estimated Gas Cost:', ethers.utils.formatEther(estimatedGasCost));
-                console.log('Slippage:', slippage);
-                console.log('Potential Profit:', potentialProfit);
-                console.log('Profit Percentage:', profitPercentage);
 
                 if (profitPercentage > slippage) {
                     setStatus(`Arbitrage opportunity found! Potential profit: ${potentialProfit.toFixed(4)} USDC (${profitPercentage.toFixed(2)}%)`, 'success');
@@ -130,25 +116,30 @@
             }
         }
 
-        async function getPriceFromUniswapV3(tokenIn, tokenOut, amount) {
+        async function getPriceFromUniswapV2(tokenA, tokenB) {
             try {
-                const chainId = 137; // Polygon MainNet
-                const [tokenInDecimals, tokenOutDecimals] = await Promise.all([
-                    getTokenDecimals(tokenIn),
-                    getTokenDecimals(tokenOut)
-                ]);
+                const response = await axios.get(`https://api.thegraph.com/subgraphs/name/uniswap/uniswap-v2`, {
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    data: JSON.stringify({
+                        query: `
+                            {
+                                pair(id: "${tokenA}-${tokenB}") {
+                                    token0Price
+                                    token1Price
+                                }
+                            }
+                        `
+                    })
+                });
 
-                const amountIn = ethers.utils.parseUnits(amount.toString(), tokenInDecimals);
-                const poolAddress = UniswapV3.getPoolAddress(tokenIn, tokenOut, 3000, UNISWAP_V3_FACTORY_ADDRESS, UNISWAP_V3_POOL_INIT_CODE_HASH);
+                const priceAtoB = parseFloat(response.data.data.pair.token0Price);
+                const priceBtoA = parseFloat(response.data.data.pair.token1Price);
 
-                const pool = new ethers.Contract(poolAddress, UniswapV3.POOL_ABI, provider);
-                const slot0 = await pool.slot0();
-                const sqrtPriceX96 = slot0.sqrtPriceX96;
-                const price = UniswapV3.getPriceFromSqrtPriceX96(sqrtPriceX96, tokenInDecimals, tokenOutDecimals);
-
-                return amountIn.mul(price).div(ethers.utils.parseUnits('1', tokenOutDecimals)).toNumber();
+                return priceAtoB / priceBtoA;
             } catch (error) {
-                console.error('Error getting price from Uniswap V3:', error);
+                console.error('Error getting price from Uniswap V2:', error);
                 throw error;
             }
         }
